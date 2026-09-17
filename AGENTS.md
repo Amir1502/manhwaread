@@ -211,8 +211,8 @@ sealed interface ValidationResult {
 | 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | ✅ выполнено |
 | 10 | Читалка: TiledImageView + OverlayLayer | ✅ выполнено |
 | 11 | Vision: OpenCV + ONNX + ML Kit OCR + Inpainting | ✅ выполнено |
-| 12 | Провайдеры перевода + Keystore + экраны настроек | 🔄 в работе |
-| 13 | Madara + Asura + Cloudflare WebView | ⬜ |
+| 12 | Провайдеры перевода + Keystore + экраны настроек | ✅ выполнено |
+| 13 | Madara + Asura + Cloudflare WebView | 🔄 в работе |
 | 14 | UI: каталог, библиотека, история, загрузки, онбординг | ⬜ |
 | 15 | Очередь, офлайн, self-check, финал | ⬜ |
 
