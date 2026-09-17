@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class SMangaTest {
-
     private val original = SManga(
         url = "/manga/1",
         title = "Solo Leveling",

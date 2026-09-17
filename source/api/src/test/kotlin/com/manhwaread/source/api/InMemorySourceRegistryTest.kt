@@ -15,7 +15,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class InMemorySourceRegistryTest {
-
     private lateinit var registry: InMemorySourceRegistry
 
     @BeforeEach
@@ -105,7 +104,7 @@ class InMemorySourceRegistryTest {
                         if (registry.register(FakeSource(id = i.toLong()))) {
                             successCount.incrementAndGet()
                         }
-                    } catch (@Suppress("SwallowedException") e: InterruptedException) {
+                    } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
                     } finally {
                         doneLatch.countDown()
@@ -132,8 +131,11 @@ class InMemorySourceRegistryTest {
         override val isNsfw: Boolean = false
         override suspend fun getPopular(page: Int): MangasPage = MangasPage(emptyList(), hasNextPage = false)
         override suspend fun getLatest(page: Int): MangasPage = MangasPage(emptyList(), hasNextPage = false)
-        override suspend fun search(query: String, filters: List<Filter>, page: Int): MangasPage =
-            MangasPage(emptyList(), hasNextPage = false)
+        override suspend fun search(
+            query: String,
+            filters: List<Filter>,
+            page: Int,
+        ): MangasPage = MangasPage(emptyList(), hasNextPage = false)
         override suspend fun getDetails(manga: SManga): SManga = manga
         override suspend fun getChapterList(manga: SManga): List<SChapter> = emptyList()
         override suspend fun getPageList(chapter: SChapter): List<Page> = emptyList()

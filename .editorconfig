@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+indent_size = 4
+insert_final_newline = true
+max_line_length = 140
+
+[*.kt]
+# Ослабляем два агрессивных правила стиля ktlint_official: перенос сигнатур
+# функций и обязательный перенос тел-выражений. Ограничение длины строки (140)
+# и остальные правила остаются в силе.
+ktlint_standard_function-signature = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+# Правило зависит от multiline-expression-wrapping и отключается вместе с ним.
+ktlint_standard_string-template-indent = disabled
+# Закреплённые контракты содержат плотные блоки val-свойств и выровненные
+# комментарии — эти два косметических правила им противоречат.
+ktlint_standard_blank-line-before-declaration = disabled
+ktlint_standard_no-multi-spaces = disabled

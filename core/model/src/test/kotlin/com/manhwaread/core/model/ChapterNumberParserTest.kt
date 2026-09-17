@@ -8,7 +8,6 @@ import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 
 class ChapterNumberParserTest {
-
     @ParameterizedTest(name = "parse(\"{0}\") == {1}")
     @MethodSource("numberCases")
     fun parseRecognizedFormats(name: String, expected: Float) {

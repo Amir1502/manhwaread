@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class ChapterSortComparatorTest {
-
     private fun chapter(name: String, number: Float, season: Int = 1): Chapter = Chapter(
         mangaId = 1L,
         url = "/s$season/$number",

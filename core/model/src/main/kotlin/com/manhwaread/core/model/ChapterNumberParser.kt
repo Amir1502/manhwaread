@@ -14,7 +14,6 @@ package com.manhwaread.core.model
  * отрицательные номера) → [UNKNOWN] (-1f). "Chapter 0" — валидный ноль.
  */
 object ChapterNumberParser {
-
     /** Нераспознанный номер главы. */
     const val UNKNOWN: Float = -1f
 
@@ -54,14 +53,18 @@ object ChapterNumberParser {
         if (normalized.isEmpty()) return Parsed(DEFAULT_SEASON, UNKNOWN)
 
         val season = SEASON_REGEX.find(normalized)?.groupValues?.get(1)?.toIntOrNull() ?: DEFAULT_SEASON
+        val number = findFirstNumber(normalized)
+        // Отрицательный номер считаем невалидным — контракт требует -1f для нераспознанного.
+        return Parsed(season, number?.takeIf { it >= 0f } ?: UNKNOWN)
+    }
 
+    /** Номер из первого сработавшего шаблона: CJK → корейский → латиница → «голое число». */
+    private fun findFirstNumber(normalized: String): Float? {
         for (regex in NUMBER_REGEXES) {
-            val match = regex.find(normalized) ?: continue
-            val value = match.groupValues[1].replace(',', '.').toFloatOrNull() ?: continue
-            // Отрицательный номер считаем невалидным — контракт требует -1f для нераспознанного.
-            return Parsed(season, if (value >= 0f) value else UNKNOWN)
+            val captured = regex.find(normalized)?.groupValues?.get(1)?.replace(',', '.')?.toFloatOrNull()
+            if (captured != null) return captured
         }
-        return Parsed(season, UNKNOWN)
+        return null
     }
 
     /** Заменяет полноширинные цифры (０-９) и точку (．) на ASCII-эквиваленты. */

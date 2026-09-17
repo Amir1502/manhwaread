@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ReadingProgressTest {
-
     @Test
     fun `START is page zero and offset zero`() {
         assertEquals(0, ReadingProgress.START.pageIndex.value)
