@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Облачко реплики с хвостом и строками текста: символ перевода манхвы. -->
+    <path
+        android:fillColor="#AAC7FF"
+        android:pathData="M34,26 H74 A12,12 0 0 1 86,38 V66 A12,12 0 0 1 74,78 H64 L50,92 V78 H34 A12,12 0 0 1 22,66 V38 A12,12 0 0 1 34,26 Z" />
+    <path
+        android:fillColor="#0A2F5C"
+        android:pathData="M36,42 H72 V48 H36 Z" />
+    <path
+        android:fillColor="#0A2F5C"
+        android:pathData="M36,56 H62 V62 H36 Z" />
+</vector>

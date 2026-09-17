@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test, static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # Wrapper коммитится с Windows — восстанавливаем executable-бит.
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # build включает unit-тесты всех модулей, detekt и ktlintCheck (через check).
+      - name: Build and run all tests
+        run: ./gradlew build --continue --stacktrace
+
+      - name: Aggregate coverage report
+        run: ./gradlew jacocoFullReport
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-full-report
+          path: build/reports/jacoco/jacocoFullReport/
+          if-no-files-found: error

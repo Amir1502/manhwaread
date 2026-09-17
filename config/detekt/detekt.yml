@@ -43,7 +43,10 @@ style:
 
 naming:
   FunctionNaming:
+    # Composable-функции по соглашению PascalCase (детект по умолчанию игнорирует их,
+    # но переопределение ignoreAnnotated затирает дефолт — возвращаем явно).
     ignoreAnnotated:
+      - 'Composable'
       - 'org.junit.jupiter.api.Test'
       - 'org.junit.jupiter.params.ParameterizedTest'
       - 'org.junit.jupiter.api.RepeatedTest'

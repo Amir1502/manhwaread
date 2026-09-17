@@ -18,3 +18,6 @@ ktlint_standard_string-template-indent = disabled
 # комментарии — эти два косметических правила им противоречат.
 ktlint_standard_blank-line-before-declaration = disabled
 ktlint_standard_no-multi-spaces = disabled
+# Composable-функции по соглашению Android называются PascalCase — правило
+# function-naming игнорирует функции с аннотацией Composable.
+ktlint_function_naming_ignore_when_annotated_with = Composable

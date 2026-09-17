@@ -30,10 +30,17 @@ kotlin {
 }
 
 dependencies {
+    // Палитра и тема — публичный API дизайн-системы для всех фиче-модулей.
+    api(platform(libs.compose.bom))
+    api(libs.compose.ui)
+    api(libs.compose.ui.graphics)
+    api(libs.compose.foundation)
+    api(libs.compose.material3)
+    api(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
+
+    // Тесты палитры — чистый JVM (математика цветов не требует Android).
     testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
-    testImplementation(libs.turbine)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

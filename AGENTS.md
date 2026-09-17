@@ -207,8 +207,8 @@ sealed interface ValidationResult {
 | 5 | `:core:vision-model` (Mask, TextFitter, OverlaySpec) + ≥40 тестов | ✅ выполнено |
 | 6 | `:core:translation-api` (валидатор LLM, промт, батчинг) + ≥35 тестов | ✅ выполнено |
 | 7 | `:core:pipeline` (StageMachine, ChapterJob) + ≥15 тестов | ✅ выполнено |
-| 8 | `:core:database` (Room, миграции, DAO-тесты) | 🔄 в работе |
-| 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | ⬜ |
+| 8 | `:core:database` (Room, миграции, DAO-тесты) | ✅ выполнено |
+| 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | 🔄 в работе |
 | 10 | Читалка: TiledImageView + OverlayLayer | ⬜ |
 | 11 | Vision: OpenCV + ONNX + ML Kit OCR + Inpainting | ⬜ |
 | 12 | Провайдеры перевода + Keystore + экраны настроек | ⬜ |

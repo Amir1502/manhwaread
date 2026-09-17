@@ -30,6 +30,16 @@ kotlin {
 }
 
 dependencies {
+    // Compose-рантайм обязателен для компиляторного плагина kotlin-compose;
+    // экраны разделов реализуются в ФАЗЕ 14.
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
+
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
