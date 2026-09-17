@@ -7,6 +7,12 @@ kotlin {
 }
 
 dependencies {
+    // DomainResult/AppError — язык ошибок модуля.
+    api(project(":core:common"))
+    // DetectedLang — язык оригинала сегментов.
+    api(project(":core:vision-model"))
+    // JSON: разбор ответов LLM и сборка payload промта.
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.kotlinx.coroutines.test)
