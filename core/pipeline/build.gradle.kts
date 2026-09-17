@@ -7,6 +7,12 @@ kotlin {
 }
 
 dependencies {
+    // DomainResult/AppError — язык результатов и ошибок конвейера.
+    api(project(":core:common"))
+    // TextSegment/OverlaySpec — данные стадий анализа и типографики.
+    api(project(":core:vision-model"))
+    // TranslatedSegment — результат стадии перевода.
+    api(project(":core:translation-api"))
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.kotlinx.coroutines.test)

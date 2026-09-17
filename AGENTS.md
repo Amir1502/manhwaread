@@ -205,8 +205,8 @@ sealed interface ValidationResult {
 | 3 | `:core:common` + `:core:network` + тесты | ✅ выполнено |
 | 4 | `:source:mangadex` + фикстуры + тесты | ✅ выполнено |
 | 5 | `:core:vision-model` (Mask, TextFitter, OverlaySpec) + ≥40 тестов | ✅ выполнено |
-| 6 | `:core:translation-api` (валидатор LLM, промт, батчинг) + ≥35 тестов | 🔄 в работе |
-| 7 | `:core:pipeline` (StageMachine, ChapterJob) + ≥15 тестов | ⬜ |
+| 6 | `:core:translation-api` (валидатор LLM, промт, батчинг) + ≥35 тестов | ✅ выполнено |
+| 7 | `:core:pipeline` (StageMachine, ChapterJob) + ≥15 тестов | 🔄 в работе |
 | 8 | `:core:database` (Room, миграции, DAO-тесты) | ⬜ |
 | 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | ⬜ |
 | 10 | Читалка: TiledImageView + OverlayLayer | ⬜ |
