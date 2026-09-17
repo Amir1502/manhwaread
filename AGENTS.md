@@ -201,8 +201,8 @@ sealed interface ValidationResult {
 |---|---|---|
 | 0 | План и якорь контрактов (AGENTS.md, README) | ✅ выполнено |
 | 1 | Gradle-каркас, все модули | ✅ выполнено |
-| 2 | `:core:model` + `:source:api` + тесты | 🔄 в работе |
-| 3 | `:core:common` + `:core:network` + тесты | ⬜ |
+| 2 | `:core:model` + `:source:api` + тесты | ✅ выполнено |
+| 3 | `:core:common` + `:core:network` + тесты | 🔄 в работе |
 | 4 | `:source:mangadex` + фикстуры + тесты | ⬜ |
 | 5 | `:core:vision-model` (Mask, TextFitter, OverlaySpec) + ≥40 тестов | ⬜ |
 | 6 | `:core:translation-api` (валидатор LLM, промт, батчинг) + ≥35 тестов | ⬜ |
