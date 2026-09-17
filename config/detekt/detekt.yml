@@ -1,0 +1,56 @@
+# Базовая конфигурация detekt для проекта Manhwaread.
+# Документация: https://detekt.dev/docs/introduction/configurations
+# Используется вместе с buildUponDefaultConfig = true (корневой build.gradle.kts).
+
+build:
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    threshold: 120
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  CyclomaticComplexMethod:
+    threshold: 20
+  TooManyFunctions:
+    thresholdInFiles: 40
+    thresholdInClasses: 30
+    thresholdInInterfaces: 20
+    thresholdInObjects: 25
+    thresholdInEnums: 10
+  LargeClass:
+    threshold: 450
+  NestedBlockDepth:
+    threshold: 5
+
+style:
+  MaxLineLength:
+    maxLineLength: 140
+  MagicNumber:
+    ignoreEnums: true
+    ignoreRanges: true
+    ignorePropertyDeclaration: true
+    ignoreConstantDeclaration: true
+  ReturnCount:
+    max: 4
+  ForbiddenComment:
+    active: false
+  UnusedPrivateMember:
+    allowedNames: '(_|ignored|expected)'
+  ThrowsCount:
+    max: 4
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated:
+      - 'org.junit.jupiter.api.Test'
+      - 'org.junit.jupiter.params.ParameterizedTest'
+      - 'org.junit.jupiter.api.RepeatedTest'
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Za-z0-9]*'
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: true
+    allowedExceptionNameRegex: '_|(ignore|expected|e|t)\w*'
