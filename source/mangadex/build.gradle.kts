@@ -7,6 +7,13 @@ kotlin {
 }
 
 dependencies {
+    // Контракт Source/SManga/SourceException; AppError и OkHttp приходят транзитивно.
+    api(project(":source:api"))
+    // RateLimiter, asAppError и CloudflareBlocked-семантика сетевого слоя.
+    implementation(project(":core:network"))
+    // Разбор JSON API v5 без DTO.
+    implementation(libs.kotlinx.serialization.json)
+
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.kotlinx.coroutines.test)

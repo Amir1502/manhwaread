@@ -1,0 +1,55 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "ch-1",
+      "type": "chapter",
+      "attributes": {
+        "title": "Начало",
+        "volume": "1",
+        "chapter": "1",
+        "translatedLanguage": "ru",
+        "publishAt": "2023-01-15T12:00:00+00:00",
+        "externalUrl": null,
+        "pages": 55
+      },
+      "relationships": [
+        {
+          "id": "group-1",
+          "type": "scanlation_group",
+          "attributes": { "name": "Reapers Scans" }
+        }
+      ]
+    },
+    {
+      "id": "ch-2",
+      "type": "chapter",
+      "attributes": {
+        "title": null,
+        "volume": "1",
+        "chapter": "2",
+        "translatedLanguage": "en",
+        "publishAt": "2023-01-20T12:00:00+00:00",
+        "externalUrl": null,
+        "pages": 48
+      },
+      "relationships": []
+    },
+    {
+      "id": "ch-ext",
+      "type": "chapter",
+      "attributes": {
+        "title": "External",
+        "chapter": "3",
+        "translatedLanguage": "en",
+        "publishAt": "2023-02-01T12:00:00+00:00",
+        "externalUrl": "https://external.example.com/chapter/3"
+      },
+      "relationships": []
+    }
+  ],
+  "limit": 200,
+  "offset": 0,
+  "total": 3
+}

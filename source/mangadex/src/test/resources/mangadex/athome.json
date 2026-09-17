@@ -1,0 +1,17 @@
+{
+  "result": "ok",
+  "baseUrl": "https://s3.mangadex.network",
+  "chapter": {
+    "hash": "abc123hash",
+    "data": [
+      "1-xyz.png",
+      "2-xyz.png",
+      "3-xyz.png"
+    ],
+    "dataSaver": [
+      "1-s.jpg",
+      "2-s.jpg",
+      "3-s.jpg"
+    ]
+  }
+}

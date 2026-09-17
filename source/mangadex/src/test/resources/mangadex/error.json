@@ -1,0 +1,12 @@
+{
+  "result": "error",
+  "errors": [
+    {
+      "id": "err-generic",
+      "status": 400,
+      "code": 400,
+      "title": "Generic error",
+      "detail": "Something went wrong"
+    }
+  ]
+}

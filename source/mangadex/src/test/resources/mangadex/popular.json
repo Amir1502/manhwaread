@@ -1,0 +1,86 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "a0a66f7b-1111-4c60-b1b4-9f1c6e0d0e01",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "ko": "나 혼자만 레벨업",
+          "en": "Solo Leveling"
+        },
+        "description": {
+          "en": "E-rank hunter Jinwoo Sung gains the power of the System.",
+          "ru": "Охотник E-ранга Сон Джин-Ву получает силу системы."
+        },
+        "status": "completed",
+        "contentRating": "safe",
+        "year": 2018,
+        "lastChapter": "110",
+        "tags": [
+          {
+            "id": "tag-action",
+            "type": "tag",
+            "attributes": { "name": { "en": "Action" } }
+          },
+          {
+            "id": "tag-fantasy",
+            "type": "tag",
+            "attributes": { "name": { "en": "Fantasy" } }
+          }
+        ]
+      },
+      "relationships": [
+        {
+          "id": "cover-1",
+          "type": "cover_art",
+          "attributes": { "fileName": "cover-solo.jpg" }
+        },
+        {
+          "id": "author-1",
+          "type": "author",
+          "attributes": { "name": "Chugong" }
+        }
+      ]
+    },
+    {
+      "id": "b1b77e8c-2222-4d78-9a4c-8d2e1f0a1b02",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "ja": "ベルセルク",
+          "en": "Berserk"
+        },
+        "description": {
+          "en": "Guts, the Black Swordsman, hunts apostles."
+        },
+        "status": "hiatus",
+        "contentRating": "erotica",
+        "year": 1989,
+        "tags": [
+          {
+            "id": "tag-action",
+            "type": "tag",
+            "attributes": { "name": { "en": "Action" } }
+          },
+          {
+            "id": "tag-drama",
+            "type": "tag",
+            "attributes": { "name": { "en": "Drama" } }
+          }
+        ]
+      },
+      "relationships": [
+        {
+          "id": "cover-2",
+          "type": "cover_art",
+          "attributes": { "fileName": "cover-berserk.png" }
+        }
+      ]
+    }
+  ],
+  "limit": 32,
+  "offset": 0,
+  "total": 64
+}

@@ -1,0 +1,22 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "ch-p1",
+      "type": "chapter",
+      "attributes": {
+        "title": null,
+        "volume": "1",
+        "chapter": "10",
+        "translatedLanguage": "ru",
+        "publishAt": "2023-03-01T00:00:00+00:00",
+        "externalUrl": null
+      },
+      "relationships": []
+    }
+  ],
+  "limit": 200,
+  "offset": 0,
+  "total": 2
+}

@@ -9,6 +9,8 @@ kotlin {
 dependencies {
     // StateFlow в SourceRegistry — часть публичного API, зависимость транзитивна.
     api(libs.kotlinx.coroutines.core)
+    // SourceException переносит доменную ошибку AppError.
+    api(project(":core:common"))
 
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)

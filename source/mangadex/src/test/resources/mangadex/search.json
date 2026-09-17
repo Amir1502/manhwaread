@@ -1,0 +1,26 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "d3d99a0e-4444-4f9a-bc6e-af4a3b2c3d04",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "en": "Berserk",
+          "ja": "ベルセルク"
+        },
+        "description": {
+          "ru": "Чёрный мечник Гатс охотится на апостолов."
+        },
+        "status": "hiatus",
+        "contentRating": "erotica",
+        "tags": []
+      },
+      "relationships": []
+    }
+  ],
+  "limit": 32,
+  "offset": 0,
+  "total": 1
+}

@@ -1,0 +1,50 @@
+{
+  "result": "ok",
+  "response": "entity",
+  "data": {
+    "id": "ee9d0a91-2222-4a17-8f5a-0a1c11c0e5c3",
+    "type": "manga",
+    "attributes": {
+      "title": {
+        "en": "Omniscient Reader's Viewpoint",
+        "ko": "전지적 독자 시점"
+      },
+      "description": {
+        "ru": "Ким Док Чхэн знает финал истории, потому что читал её десять лет.",
+        "en": "Kim Dokja knows the ending of the story."
+      },
+      "status": "ongoing",
+      "contentRating": "suggestive",
+      "year": 2020,
+      "tags": [
+        {
+          "id": "tag-action",
+          "type": "tag",
+          "attributes": { "name": { "en": "Action" } }
+        },
+        {
+          "id": "tag-drama",
+          "type": "tag",
+          "attributes": { "name": { "en": "Drama" } }
+        }
+      ]
+    },
+    "relationships": [
+      {
+        "id": "cover-3",
+        "type": "cover_art",
+        "attributes": { "fileName": "cover-orv.jpg" }
+      },
+      {
+        "id": "author-3",
+        "type": "author",
+        "attributes": { "name": "Sing N Shong" }
+      },
+      {
+        "id": "artist-3",
+        "type": "artist",
+        "attributes": { "name": "Sleepy-C" }
+      }
+    ]
+  }
+}

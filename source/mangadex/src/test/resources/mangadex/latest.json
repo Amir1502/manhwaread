@@ -1,0 +1,24 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "c2c88f9d-3333-4e89-ab5d-9e3f2a1b2c03",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "ja": "ワンピース",
+          "en": "One Piece"
+        },
+        "status": "ongoing",
+        "contentRating": "safe",
+        "year": 1997,
+        "tags": []
+      },
+      "relationships": []
+    }
+  ],
+  "limit": 32,
+  "offset": 32,
+  "total": 64
+}
