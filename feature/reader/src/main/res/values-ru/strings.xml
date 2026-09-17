@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reader_back">Назад</string>
+    <string name="reader_empty">Глава не загружена</string>
+    <string name="reader_mode_webtoon">Вебтун</string>
+    <string name="reader_mode_vertical">Вертикально</string>
+    <string name="reader_mode_ltr">Слева направо</string>
+    <string name="reader_mode_rtl">Справа налево</string>
+    <string name="reader_overlay_show">Показать перевод</string>
+    <string name="reader_overlay_hide">Скрыть перевод</string>
+    <string name="reader_bubble_original">Оригинал</string>
+    <string name="reader_bubble_translated">Перевод</string>
+    <string name="reader_no_translation">Перевода пока нет</string>
+</resources>

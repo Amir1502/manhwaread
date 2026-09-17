@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reader_back">Back</string>
+    <string name="reader_empty">Chapter not loaded</string>
+    <string name="reader_mode_webtoon">Webtoon</string>
+    <string name="reader_mode_vertical">Vertical pages</string>
+    <string name="reader_mode_ltr">Left to right</string>
+    <string name="reader_mode_rtl">Right to left</string>
+    <string name="reader_overlay_show">Show translation</string>
+    <string name="reader_overlay_hide">Hide translation</string>
+    <string name="reader_bubble_original">Original</string>
+    <string name="reader_bubble_translated">Translation</string>
+    <string name="reader_no_translation">No translation yet</string>
+</resources>

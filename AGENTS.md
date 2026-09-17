@@ -208,8 +208,8 @@ sealed interface ValidationResult {
 | 6 | `:core:translation-api` (валидатор LLM, промт, батчинг) + ≥35 тестов | ✅ выполнено |
 | 7 | `:core:pipeline` (StageMachine, ChapterJob) + ≥15 тестов | ✅ выполнено |
 | 8 | `:core:database` (Room, миграции, DAO-тесты) | ✅ выполнено |
-| 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | 🔄 в работе |
-| 10 | Читалка: TiledImageView + OverlayLayer | ⬜ |
+| 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | ✅ выполнено |
+| 10 | Читалка: TiledImageView + OverlayLayer | 🔄 в работе |
 | 11 | Vision: OpenCV + ONNX + ML Kit OCR + Inpainting | ⬜ |
 | 12 | Провайдеры перевода + Keystore + экраны настроек | ⬜ |
 | 13 | Madara + Asura + Cloudflare WebView | ⬜ |

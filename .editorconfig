@@ -11,6 +11,12 @@ max_line_length = 140
 # функций и обязательный перенос тел-выражений. Ограничение длины строки (140)
 # и остальные правила остаются в силе.
 ktlint_standard_function-signature = disabled
+# То же для классов: канонический для Hilt/Dagger вид
+# `class X @Inject constructor(...)` правило требует разрывать на строки.
+ktlint_standard_class-signature = disabled
+# Правило annotation требует переноса @Inject у конструктора — формат
+# `class X @Inject constructor(...)` является стандартом экосистемы Hilt.
+ktlint_standard_annotation = disabled
 ktlint_standard_multiline-expression-wrapping = disabled
 # Правило зависит от multiline-expression-wrapping и отключается вместе с ним.
 ktlint_standard_string-template-indent = disabled
