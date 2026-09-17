@@ -209,8 +209,8 @@ sealed interface ValidationResult {
 | 7 | `:core:pipeline` (StageMachine, ChapterJob) + ≥15 тестов | ✅ выполнено |
 | 8 | `:core:database` (Room, миграции, DAO-тесты) | ✅ выполнено |
 | 9 | `:app` + Hilt + навигация + тема + CI + Jacoco | ✅ выполнено |
-| 10 | Читалка: TiledImageView + OverlayLayer | 🔄 в работе |
-| 11 | Vision: OpenCV + ONNX + ML Kit OCR + Inpainting | ⬜ |
+| 10 | Читалка: TiledImageView + OverlayLayer | ✅ выполнено |
+| 11 | Vision: OpenCV + ONNX + ML Kit OCR + Inpainting | 🔄 в работе |
 | 12 | Провайдеры перевода + Keystore + экраны настроек | ⬜ |
 | 13 | Madara + Asura + Cloudflare WebView | ⬜ |
 | 14 | UI: каталог, библиотека, история, загрузки, онбординг | ⬜ |
