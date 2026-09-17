@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Manhwaread</string>
+    <string name="catalog_title">Каталог MangaDex</string>
+    <string name="catalog_subtitle">Манга и манхва · без контента 18+</string>
+    <string name="search_hint">Название тайтла</string>
+    <string name="search">Найти</string>
+    <string name="popular">Популярное</string>
+    <string name="search_results">Результаты поиска</string>
+    <string name="empty_catalog">Ничего не найдено. Попробуйте другое название.</string>
+    <string name="retry">Повторить</string>
+    <string name="load_more">Загрузить ещё</string>
+    <string name="back">Назад</string>
+    <string name="loading">Загрузка</string>
+    <string name="error_network">Не удалось связаться с источником. Проверьте подключение и повторите запрос.</string>
+    <string name="error_rate_limit">MangaDex ограничил частоту запросов. Повторите позже.</string>
+    <string name="error_format">Источник вернул неподдерживаемые данные.</string>
+    <string name="error_unknown">Не удалось обработать запрос. Попробуйте ещё раз.</string>
+    <string name="cover_description">Обложка: %1$s</string>
+    <string name="no_description">Описание отсутствует.</string>
+    <string name="author">Автор: %1$s</string>
+    <string name="artist">Художник: %1$s</string>
+    <string name="chapters_count">Главы: %1$d</string>
+    <string name="no_chapters">Нет размещённых на MangaDex глав на русском, английском, корейском или японском.</string>
+    <string name="foundation_notice">В этой версии доступны каталог и список глав. Читалка и AI-перевод ещё не подключены.</string>
+    <string name="expand_description">Показать описание полностью</string>
+    <string name="collapse_description">Свернуть описание</string>
+</resources>
