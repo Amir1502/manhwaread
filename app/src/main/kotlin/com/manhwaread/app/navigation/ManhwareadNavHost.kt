@@ -23,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.manhwaread.feature.settings.SettingsRoute
 
 private val PlaceholderIconSize = 48.dp
 
@@ -76,7 +77,12 @@ fun ManhwareadNavHost(
     ) {
         AppRoute.entries.forEach { destination ->
             composable(route = destination.route) {
-                SectionPlaceholderScreen(destination)
+                if (destination == AppRoute.SETTINGS) {
+                    // ФАЗА 12: экран настроек провайдера перевода — рабочий раздел.
+                    SettingsRoute()
+                } else {
+                    SectionPlaceholderScreen(destination)
+                }
             }
         }
     }

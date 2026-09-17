@@ -50,6 +50,8 @@ kotlin {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:database"))
+    // Настройки провайдера перевода подключены к NavHost (ФАЗА 12).
+    implementation(project(":feature:settings"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

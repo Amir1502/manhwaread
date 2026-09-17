@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_section_translation">Translation provider</string>
+    <string name="settings_provider_label">Provider</string>
+    <string name="settings_provider_none">Not selected</string>
+    <string name="settings_base_url_label">Base URL</string>
+    <string name="settings_model_label">Model</string>
+    <string name="settings_api_key_label">API key</string>
+    <string name="settings_api_key_saved">Key saved (encrypted). Leave empty to keep it.</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_test">Test connection</string>
+    <string name="settings_saved">Settings saved</string>
+    <string name="settings_test_success">Success: %1$s responded</string>
+    <string name="settings_configuration_invalid">Check the provider settings: API key is required</string>
+    <string name="settings_error_network">Network error — check the connection</string>
+    <string name="settings_error_auth">Key rejected by the provider (401/403)</string>
+    <string name="settings_error_quota">Provider quota exhausted</string>
+    <string name="settings_error_rate_limited">Too many requests — try again later</string>
+    <string name="settings_error_bad_response">Bad provider response: %1$s</string>
+    <string name="settings_error_unknown">Unexpected error</string>
+</resources>

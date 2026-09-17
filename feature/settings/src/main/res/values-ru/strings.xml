@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Настройки</string>
+    <string name="settings_back">Назад</string>
+    <string name="settings_section_translation">Провайдер перевода</string>
+    <string name="settings_provider_label">Провайдер</string>
+    <string name="settings_provider_none">Не выбран</string>
+    <string name="settings_base_url_label">Base URL</string>
+    <string name="settings_model_label">Модель</string>
+    <string name="settings_api_key_label">API-ключ</string>
+    <string name="settings_api_key_saved">Ключ сохранён (шифруется). Оставьте пустым, чтобы не менять.</string>
+    <string name="settings_save">Сохранить</string>
+    <string name="settings_test">Проверить соединение</string>
+    <string name="settings_saved">Настройки сохранены</string>
+    <string name="settings_test_success">Успех: %1$s ответил</string>
+    <string name="settings_configuration_invalid">Проверьте настройки провайдера: нужен API-ключ</string>
+    <string name="settings_error_network">Ошибка сети — проверьте подключение</string>
+    <string name="settings_error_auth">Ключ отклонён провайдером (401/403)</string>
+    <string name="settings_error_quota">Квота провайдера исчерпана</string>
+    <string name="settings_error_rate_limited">Слишком много запросов — повторите позже</string>
+    <string name="settings_error_bad_response">Некорректный ответ провайдера: %1$s</string>
+    <string name="settings_error_unknown">Неожиданная ошибка</string>
+</resources>
