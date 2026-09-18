@@ -51,6 +51,13 @@ class ChapterDateParserTest {
     }
 
     @Test
+    fun `short two-digit year dates parse (manga stream theme)`() {
+        val expected = LocalDate.of(2026, 9, 4).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        assertEquals(expected, parseChapterDate("04 Sep 26", now))
+        assertEquals(expected, parseChapterDate("4 Sep 26", now))
+    }
+
+    @Test
     fun `unrecognized dates are zero`() {
         assertEquals(0L, parseChapterDate("just now", now))
         assertEquals(0L, parseChapterDate("", now))

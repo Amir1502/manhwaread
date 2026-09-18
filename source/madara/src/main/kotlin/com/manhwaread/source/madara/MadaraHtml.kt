@@ -10,16 +10,27 @@ import com.manhwaread.source.api.parseMangaStatusText
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
-// Чистый jsoup-парсинг разметки темы Madara: без сети, тестируется фикстурами.
-// Пустые результаты трактуются источником как сбой разметки (SourceLayoutChanged).
+// Чистый jsoup-парсинг разметки тем Madara и MangaStream: без сети,
+// тестируется фикстурами. Пустые результаты трактуются источником как сбой
+// разметки (SourceLayoutChanged).
 object MadaraHtml {
-    private const val CARD_SELECTOR = "div.page-item-detail, div.c-tabs-item__content"
-    private const val NEXT_PAGE_SELECTOR = "a.next.page-numbers"
-    private const val TITLE_LINK_SELECTOR = "h3 a, h4 a, div.post-title a"
-    private const val CHAPTER_ITEM_SELECTOR = "li.wp-manga-chapter"
-    private const val CHAPTER_DATE_SELECTOR = "span.chapter-release-date, span.chapter-postdate"
+    // Карточка тайтла: Madara (page-item-detail, c-tabs-item__content) и
+    // MangaStream (bsx-item, hot-item — manga18fx).
+    private const val CARD_SELECTOR =
+        "div.page-item-detail, div.c-tabs-item__content, div.bsx-item, div.hot-item"
+
+    // Следующая страница: Madara (a.next.page-numbers) и MangaStream (li.next a).
+    private const val NEXT_PAGE_SELECTOR = "a.next.page-numbers, li.next a"
+    private const val TITLE_LINK_SELECTOR = "h3 a, h4 a, div.post-title a, div.thumb-manga a, a[title]"
+
+    // Список глав: Madara (wp-manga-chapter) и MangaStream (a-h — manga18fx).
+    private const val CHAPTER_ITEM_SELECTOR = "li.wp-manga-chapter, li.a-h"
+    private const val CHAPTER_DATE_SELECTOR =
+        "span.chapter-release-date, span.chapter-postdate, span.chapter-time"
     private const val PAGE_IMAGE_SELECTOR = "div.reading-content img, div.page-break img"
     private const val CHAPTERS_HOLDER_SELECTOR = "div#manga-chapters-holder"
+    private const val DESCRIPTION_SELECTOR =
+        "div.description-summary, div.summary__content, div.contenu-summary, div.panel-story-description div.dsct"
 
     fun parseMangaList(document: Document, baseUrl: String, sourceId: Long): MangasPage {
         val mangas = document.select(CARD_SELECTOR).mapNotNull { card -> parseCard(card, baseUrl, sourceId) }
@@ -34,7 +45,7 @@ object MadaraHtml {
         val author = joinNames(document.select("div.author-content a"))
         val artist = joinNames(document.select("div.artist-content a"))
         val description = document
-            .selectFirst("div.description-summary, div.summary__content, div.contenu-summary")
+            .selectFirst(DESCRIPTION_SELECTOR)
             ?.text()?.trim()?.ifBlank { null }
         val genres = document.select("div.genres-content a")
             .map { element -> element.text().trim() }
@@ -76,8 +87,12 @@ object MadaraHtml {
     private fun parseCard(card: Element, baseUrl: String, sourceId: Long): SManga? {
         val link = card.selectFirst(TITLE_LINK_SELECTOR) ?: return null
         val url = toPath(link.attr("abs:href").ifBlank { link.attr("href") }, baseUrl) ?: return null
-        val title = link.text().trim()
+        // Заголовок: h3/h4 карточки (Madara post-title, MangaStream bigor/caption),
+        // затем title ссылки (hot-item) и alt обложки.
+        val title = card.selectFirst("h3, h4")?.text()?.trim().orEmpty()
+            .ifBlank { link.attr("title").trim() }
             .ifBlank { card.selectFirst("img")?.attr("alt")?.trim().orEmpty() }
+            .ifBlank { link.text().trim() }
         if (title.isBlank()) return null
         val thumbnail = card.selectFirst("img")?.let { image -> imageSource(image).ifBlank { null } }
         return SManga(url = url, title = title, sourceId = sourceId, thumbnailUrl = thumbnail)

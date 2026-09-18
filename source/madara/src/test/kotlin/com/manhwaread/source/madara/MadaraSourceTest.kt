@@ -76,6 +76,13 @@ class MadaraSourceTest {
     private fun source(useAjaxChapters: Boolean = false) =
         MadaraSource(config(useAjaxChapters), client, clock = { now })
 
+    // Конфиг manga18fx (тема MangaStream) с baseUrl тестового сервера.
+    private fun m18Source() = MadaraSource(
+        manga18fxConfig().copy(baseUrl = server.url("").toString().trimEnd('/')),
+        client,
+        clock = { now },
+    )
+
     private fun manga(url: String = "/manga/solo-leveling") = SManga(url = url, title = "Solo", sourceId = 2L)
 
     @Test
@@ -111,6 +118,39 @@ class MadaraSourceTest {
         val sort = Filter.Sort(name = "Order", options = listOf("Popular", "Latest"), selectedIndex = 1)
         source().search("  ", listOf(sort), 1)
         assertEquals("/manga/page/1/?m_orderby=latest", server.takeRequest().path)
+    }
+
+    @Test
+    fun `manga18fx popular uses hot-manga template`() = runTest {
+        server.enqueue(MockResponse().setBody(listHtml))
+        m18Source().getPopular(2)
+        val recorded = server.takeRequest()
+        assertEquals("/hot-manga?page=2", recorded.path)
+        assertEquals("age_verified=1", recorded.getHeader("Cookie"))
+    }
+
+    @Test
+    fun `manga18fx latest uses root pagination template`() = runTest {
+        server.enqueue(MockResponse().setBody(listHtml))
+        m18Source().getLatest(3)
+        assertEquals("/page/3", server.takeRequest().path)
+    }
+
+    @Test
+    fun `manga18fx search sends q parameter`() = runTest {
+        server.enqueue(MockResponse().setBody(listHtml))
+        m18Source().search("secret", emptyList(), 1)
+        val path = server.takeRequest().path.orEmpty()
+        assertTrue(path.startsWith("/search?page=1"), path)
+        assertTrue(path.contains("q=secret"), path)
+    }
+
+    @Test
+    fun `manga18fx blank search with latest sort uses root pagination`() = runTest {
+        server.enqueue(MockResponse().setBody(listHtml))
+        val sort = Filter.Sort(name = "Order", options = listOf("Popular", "Latest"), selectedIndex = 1)
+        m18Source().search("", listOf(sort), 2)
+        assertEquals("/page/2", server.takeRequest().path)
     }
 
     @Test

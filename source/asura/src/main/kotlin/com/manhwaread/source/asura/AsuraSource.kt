@@ -24,16 +24,16 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Источник Asura Scans (asuracomic.net, Next.js-вёрстка). Контракт Source
+ * Источник Asura Scans (asurascans.com, сборка Astro). Контракт Source
  * закреплён (AGENTS.md); url тайтлов/глав — пути от baseUrl (формат MangaDex).
  *
  * Селекторы и пути вынесены в [AsuraManifest]: при смене вёрстки сайт перестаёт
  * парситься, источник сообщает SourceLayoutChanged «update the manifest» и не
  * падает (DoD ФАЗЫ 13).
  *
- * - каталог: GET /comics?page={n}&sort=popular|latest[&name={query}];
- * - карточка: GET /comic/{slug} → h1/og:meta/жанры/главы a[href*=/chapter-];
- * - страницы главы: JSON из script#__NEXT_DATA__ → массив ссылок на картинки.
+ * - каталог: GET /browse?page={n}&sort=popular|latest[&name={query}];
+ * - карточка: GET /comics/{slug} → h1/og:meta/жанры/главы a[href*=/chapter/];
+ * - страницы главы: серверные <img src="…/asura-images/chapters/…">.
  */
 class AsuraSource(
     private val client: OkHttpClient,
@@ -160,7 +160,7 @@ class AsuraSource(
         const val SOURCE_NAME = "Asura Scans"
         private const val MAX_CONCURRENT = 3
         private const val MIN_INTERVAL_MS = 300L
-        private const val RATE_LIMIT_DOMAIN = "asuracomic.net"
+        private const val RATE_LIMIT_DOMAIN = "asurascans.com"
         private const val SORT_INDEX_POPULAR = 0
         private const val SORT_INDEX_LATEST = 1
         private const val HEADER_RETRY_AFTER = "Retry-After"

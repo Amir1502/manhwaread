@@ -19,6 +19,8 @@ private val ABSOLUTE_FORMATS = listOf(
     DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH),
     DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH),
     DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH),
+    // Тема MangaStream (manga18fx): короткий формат «04 Sep 26».
+    DateTimeFormatter.ofPattern("d MMM yy", Locale.ENGLISH),
     DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH),
 )
 

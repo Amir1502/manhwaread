@@ -8,15 +8,10 @@ import com.manhwaread.source.api.SManga
 import com.manhwaread.source.api.parseChapterDate
 import com.manhwaread.source.api.parseChapterNumber
 import com.manhwaread.source.api.parseMangaStatusText
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
-// Чистый jsoup/JSON-парсинг Asura Scans (Next.js-вёрстка). Без сети —
+// Чистый jsoup-парсинг Asura Scans (asurascans.com, сборка Astro). Без сети —
 // тестируется фикстурами; пустые результаты источник трактует как сбой
 // разметки (SourceLayoutChanged «update the manifest»).
 object AsuraHtml {
@@ -26,7 +21,8 @@ object AsuraHtml {
         // с префиксом comicLinkPrefix, не содержащий chapterLinkInfix.
         val mangas = document.select("a[href]")
             .mapNotNull { link -> parseComicCard(link, manifest, sourceId, seen) }
-        // У Asura подгрузка страниц бесконечная: пока карточки есть — есть и следующая страница.
+        // /browse пагинируется сервером: пока карточки есть — есть и следующая
+        // страница; на переполнении сайт отдаёт пустую сетку.
         return MangasPage(mangas = mangas, hasNextPage = mangas.isNotEmpty())
     }
 
@@ -86,9 +82,9 @@ object AsuraHtml {
             val href = link.attr("abs:href").ifBlank { link.attr("href") }
             val url = toPath(href, manifest.baseUrl) ?: return@mapNotNull null
             val spans = link.select("span")
-            // Имя: первый span; если он пуст — из slug-а (chapter-110 → Chapter 110).
-            // Текст ссылки целиком — фолбэк только когда span-ов нет вовсе
-            // (иначе в имя попала бы дата из второго span).
+            // Имя: первый span; если он пуст — из последнего сегмента url
+            // (/chapter/110 → Chapter 110). Текст ссылки целиком — фолбэк
+            // только когда span-ов нет вовсе (иначе в имя попала бы дата).
             val name = if (spans.isEmpty()) {
                 link.text().trim().ifBlank { chapterNameFromSlug(url) }
             } else {
@@ -105,51 +101,14 @@ object AsuraHtml {
             )
         }
 
-    // Страницы главы — из JSON скрипта __NEXT_DATA__ (Next.js payload).
-    fun parsePages(document: Document, manifest: AsuraManifest): List<Page> {
-        val script = document.getElementById(manifest.nextDataElementId) ?: return emptyList()
-        val payload = script.data().ifBlank { script.html() }
-        val root = runCatching { Json.parseToJsonElement(payload) }.getOrNull() ?: return emptyList()
-        val images = findImageArray(root, manifest.imageContainerKeys) ?: return emptyList()
-        return images.mapIndexed { index, url -> Page(index = index, imageUrl = url) }
-    }
-
-    // Обход JSON в глубину: первый массив строк под ключом из [keys].
-    private fun findImageArray(element: JsonElement, keys: Set<String>): List<String>? =
-        when (element) {
-            is JsonObject -> findImageArrayInObject(element, keys)
-            is JsonArray -> findImageArrayInArray(element, keys)
-            is JsonPrimitive -> null
-        }
-
-    private fun findImageArrayInObject(obj: JsonObject, keys: Set<String>): List<String>? {
-        for ((key, value) in obj) {
-            val direct = directImageArray(key, value, keys)
-            if (direct != null) return direct
-        }
-        for ((_, value) in obj) {
-            val nested = findImageArray(value, keys)
-            if (nested != null) return nested
-        }
-        return null
-    }
-
-    private fun findImageArrayInArray(array: JsonArray, keys: Set<String>): List<String>? {
-        for (item in array) {
-            val nested = findImageArray(item, keys)
-            if (nested != null) return nested
-        }
-        return null
-    }
-
-    // Массив подходит, если он непустой и целиком из строк (иначе это не картинки).
-    private fun directImageArray(key: String, value: JsonElement, keys: Set<String>): List<String>? {
-        if (key !in keys || value !is JsonArray) return null
-        val urls = value.mapNotNull { item ->
-            (item as? JsonPrimitive)?.takeIf { primitive -> primitive.isString }?.content
-        }
-        return urls.takeIf { list -> list.isNotEmpty() && list.size == value.size }
-    }
+    // Страницы главы — серверный рендер Astro: <img> со src (или ленивым
+    // data-src) на CDN-каталог главы; обложки отсекаются маркером манифеста.
+    fun parsePages(document: Document, manifest: AsuraManifest): List<Page> =
+        document.select("img")
+            .mapNotNull { image -> imageSource(image).ifBlank { null } }
+            .filter { source -> manifest.chapterImageSrcMarker in source }
+            .distinct()
+            .mapIndexed { index, url -> Page(index = index, imageUrl = url) }
 
     private fun cardTitle(link: Element): String =
         link.selectFirst("img")?.attr("alt")?.trim().orEmpty()
@@ -162,9 +121,11 @@ object AsuraHtml {
     private fun metaContent(document: Document, key: String): String? =
         document.selectFirst("meta[property=$key], meta[name=$key]")?.attr("content")?.trim()
 
-    // "/comic/solo-leveling/chapter-110" → "Chapter 110".
+    // Новая раскладка "/comics/solo/chapter/110" → "Chapter 110";
+    // старая "/comic/solo/chapter-110" → "Chapter 110".
     internal fun chapterNameFromSlug(url: String): String {
         val slug = url.substringAfterLast('/', "")
+        if (slug.replace(',', '.').toDoubleOrNull() != null) return "Chapter $slug"
         return slug.replace('-', ' ')
             .replaceFirstChar { first -> first.uppercaseChar() }
             .ifBlank { url }

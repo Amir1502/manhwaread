@@ -158,12 +158,163 @@ class MadaraHtmlTest {
     }
 
     @Test
-    fun `manga18fx config carries age gate`() {
+    fun `manga18fx config targets manga stream layout`() {
         val config = manga18fxConfig()
         assertEquals("Manga18fx", config.name)
         assertEquals("https://manga18fx.com", config.baseUrl)
         assertTrue(config.isNsfw)
         assertEquals("age_verified=1", config.adultCookie)
         assertEquals(2L, config.id)
+        // Новая раскладка (2025): /hot-manga, корневая пагинация, /search?q=.
+        assertEquals("/hot-manga?page={page}", config.popularPathTemplate)
+        assertEquals("/page/{page}", config.latestPathTemplate)
+        assertEquals("/search?page={page}", config.searchPathTemplate)
+        assertEquals("q", config.searchQueryParam)
+        assertTrue(config.searchExtraParams.isEmpty())
+    }
+
+    // Фикстуры темы MangaStream (manga18fx c 2025): карточки bsx-item/hot-item,
+    // пагинация blog-pager li.next, главы li.a-h с датой «04 Sep 26».
+    private val mangaStreamListHtml = """
+        <html><body>
+        <div class="listupd">
+          <div class="page-item">
+            <div class="bsx-item">
+              <div class="thumb-manga">
+                <a href="/manga/secret-class-01">
+                  <div class="adult-badges">18+</div>
+                  <img data-src="https://manga18fx.com/webtoon/secret-classm.jpg"
+                       src="https://manga18fx.com/webtoon/secret-classm.jpg" alt="Secret Class">
+                </a>
+              </div>
+              <div class="bigor-manga">
+                <h3 class="tt"><a href="/manga/secret-class-01">Secret Class</a></h3>
+              </div>
+            </div>
+          </div>
+          <div class="hot-item mycover">
+            <a href="/manga/opentalk" title="OpenTalk">
+              <div class="chapter-badges">Chapter. 8</div>
+              <img src="https://manga18fx.com/webtoon/opentalkm.jpg" alt="OpenTalk">
+              <div class="caption"><h3>OpenTalk</h3></div>
+            </a>
+          </div>
+        </div>
+        <div class="blog-pager" id="blog-pager">
+          <ul class="pagination">
+            <li class="prev disabled"><span>&laquo;</span></li>
+            <li class="active"><a href="/page/1" data-page="0">1</a></li>
+            <li class="next"><a href="/page/2" data-page="1">&raquo;</a></li>
+          </ul>
+        </div>
+        </body></html>
+    """.trimIndent()
+
+    @Test
+    fun `manga stream list parses both card types and next page`() {
+        val page = MadaraHtml.parseMangaList(Jsoup.parse(mangaStreamListHtml, baseUrl), baseUrl, 2L)
+        assertEquals(2, page.mangas.size)
+        assertTrue(page.hasNextPage)
+        val first = page.mangas[0]
+        assertEquals("/manga/secret-class-01", first.url)
+        assertEquals("Secret Class", first.title)
+        assertEquals("https://manga18fx.com/webtoon/secret-classm.jpg", first.thumbnailUrl)
+        val second = page.mangas[1]
+        assertEquals("/manga/opentalk", second.url)
+        assertEquals("OpenTalk", second.title)
+        assertEquals("https://manga18fx.com/webtoon/opentalkm.jpg", second.thumbnailUrl)
+    }
+
+    @Test
+    fun `manga stream last page has no next link`() {
+        val html = mangaStreamListHtml.replace(
+            """<li class="next"><a href="/page/2" data-page="1">&raquo;</a></li>""",
+            """<li class="next disabled"><span>&raquo;</span></li>""",
+        )
+        val page = MadaraHtml.parseMangaList(Jsoup.parse(html, baseUrl), baseUrl, 2L)
+        assertEquals(2, page.mangas.size)
+        assertFalse(page.hasNextPage)
+    }
+
+    private val mangaStreamTitleHtml = """
+        <html><body>
+        <div class="post-title"><h1>Secret Class</h1></div>
+        <div class="tab-summary">
+          <div class="summary_image">
+            <a href="/manga/secret-class-01"><img class="img-loading"
+              data-src="https://manga18fx.com/webtoon/secret-classm.jpg" alt="Secret Class"></a>
+          </div>
+          <div class="post-status"><div class="post-content_item">
+            <div class="summary-heading"><h5>Release</h5></div>
+            <div class="summary-content" style="text-align: right">Ongoing</div>
+          </div></div>
+          <div class="author-content"><a>Author Name</a></div>
+          <div class="artist-content"><a>Artist Name</a></div>
+          <div class="genres-content"><a>Comedy</a><a>Drama</a></div>
+        </div>
+        <div class="panel-story-description">
+          <h2 class="manga-panel-title">Summary</h2>
+          <div class="dsct"><p>Secret Class is about a wife of two.</p></div>
+        </div>
+        <ul class="main-chap">
+          <li class="a-h">
+            <a class="chapter-name text-nowrap" href="/manga/secret-class-01/chapter-317"
+               title="Secret Class Chapter 317">Chapter 317</a>
+            <span class="chapter-time text-nowrap" title="">04 Sep 26</span>
+          </li>
+          <li class="a-h">
+            <a class="chapter-name text-nowrap" href="/manga/secret-class-01/chapter-316-5">Chapter 316.5</a>
+            <span class="chapter-time text-nowrap" title="">17 Sep 26</span>
+          </li>
+        </ul>
+        </body></html>
+    """.trimIndent()
+
+    @Test
+    fun `manga stream details parses summary and status`() {
+        val manga = MadaraHtml.parseDetails(
+            Jsoup.parse(mangaStreamTitleHtml, baseUrl),
+            "/manga/secret-class-01",
+            2L,
+            nsfw = true,
+        )
+        requireNotNull(manga)
+        assertEquals("Secret Class", manga.title)
+        assertEquals("Secret Class is about a wife of two.", manga.description)
+        assertEquals(MangaStatus.ONGOING, manga.status)
+        assertEquals(listOf("Comedy", "Drama"), manga.genres)
+        assertEquals("Author Name", manga.author)
+        assertEquals("https://manga18fx.com/webtoon/secret-classm.jpg", manga.thumbnailUrl)
+        assertTrue(manga.nsfw)
+    }
+
+    @Test
+    fun `manga stream chapters parse with short dates`() {
+        val chapters = MadaraHtml.parseChapters(Jsoup.parse(mangaStreamTitleHtml, baseUrl), baseUrl, now)
+        assertEquals(2, chapters.size)
+        val first = chapters[0]
+        assertEquals("/manga/secret-class-01/chapter-317", first.url)
+        assertEquals("Chapter 317", first.name)
+        assertEquals(317f, first.chapterNumber)
+        val expected = java.time.LocalDate.of(2026, 9, 4)
+            .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        assertEquals(expected, first.dateUpload)
+        assertEquals(316.5f, chapters[1].chapterNumber)
+    }
+
+    @Test
+    fun `manga stream pages parse from page-break`() {
+        val html = """
+            <html><body>
+            <div class="page-break">
+              <img class="loading p1" data-src="https://img01.manga18fx.com/uploads/264/1/1-001.jpg"
+                   src="https://img01.manga18fx.com/uploads/264/1/1-001.jpg" loading="lazy"
+                   alt="Secret Class - Chapter 1">
+            </div>
+            </body></html>
+        """.trimIndent()
+        val pages = MadaraHtml.parsePages(Jsoup.parse(html, baseUrl))
+        assertEquals(1, pages.size)
+        assertEquals("https://img01.manga18fx.com/uploads/264/1/1-001.jpg", pages[0].imageUrl)
     }
 }

@@ -23,19 +23,24 @@ class AsuraSourceTest {
 
     private val listHtml = """
         <html><body>
-        <a href="/comic/solo-leveling"><img alt="Solo Leveling" src="https://cdn.asura/1.jpg"></a>
+        <a href="/comics/solo-leveling-6f7fe6eb"><img alt="Solo Leveling" src="https://cdn.asura/1.jpg"></a>
         </body></html>
     """.trimIndent()
 
     private val detailsHtml = """
         <html><body>
         <h1>Solo Leveling</h1>
-        <a href="/comic/solo-leveling/chapter-110"><span>Chapter 110</span><span>2 days ago</span></a>
+        <a href="/comics/solo-leveling-6f7fe6eb/chapter/110"><span>Chapter 110</span><span>2 days ago</span></a>
         </body></html>
     """.trimIndent()
 
+    // Глава новой раскладки: серверные <img> с CDN-маркером из манифеста.
     private val chapterHtml = """
-        <html><script id="__NEXT_DATA__">{"props":{"pageProps":{"chapter":{"images":["https://tooning.asura/1.png"]}}}}</script></html>
+        <html><body>
+        <div data-page="0">
+          <img src="https://cdn.asurascans.com/asura-images/chapters/solo/110/a.webp" alt="Page 1">
+        </div>
+        </body></html>
     """.trimIndent()
 
     @BeforeEach
@@ -59,14 +64,14 @@ class AsuraSourceTest {
         server.enqueue(MockResponse().setBody(listHtml))
         val page = source().getPopular(2)
         assertEquals(1, page.mangas.size)
-        assertEquals("/comics?page=2&sort=popular", server.takeRequest().path)
+        assertEquals("/browse?page=2&sort=popular", server.takeRequest().path)
     }
 
     @Test
     fun `latest requests latest sort`() = runTest {
         server.enqueue(MockResponse().setBody(listHtml))
         source().getLatest(1)
-        assertEquals("/comics?page=1&sort=latest", server.takeRequest().path)
+        assertEquals("/browse?page=1&sort=latest", server.takeRequest().path)
     }
 
     @Test
@@ -81,34 +86,34 @@ class AsuraSourceTest {
     @Test
     fun `details returns initialized manga`() = runTest {
         server.enqueue(MockResponse().setBody(detailsHtml))
-        val details = source().getDetails(SManga(url = "/comic/solo-leveling", title = "x", sourceId = 3L))
+        val details = source().getDetails(SManga(url = "/comics/solo-leveling-6f7fe6eb", title = "x", sourceId = 3L))
         assertEquals("Solo Leveling", details.title)
         assertTrue(details.initialized)
-        assertEquals("/comic/solo-leveling", server.takeRequest().path)
+        assertEquals("/comics/solo-leveling-6f7fe6eb", server.takeRequest().path)
     }
 
     @Test
     fun `chapters come from details page`() = runTest {
         server.enqueue(MockResponse().setBody(detailsHtml))
-        val chapters = source().getChapterList(SManga(url = "/comic/solo-leveling", title = "x", sourceId = 3L))
+        val chapters = source().getChapterList(SManga(url = "/comics/solo-leveling-6f7fe6eb", title = "x", sourceId = 3L))
         assertEquals(1, chapters.size)
-        assertEquals("/comic/solo-leveling/chapter-110", chapters[0].url)
+        assertEquals("/comics/solo-leveling-6f7fe6eb/chapter/110", chapters[0].url)
         assertEquals(now - 2 * 86_400_000L, chapters[0].dateUpload)
     }
 
     @Test
-    fun `pages come from next data`() = runTest {
+    fun `pages come from chapter images`() = runTest {
         server.enqueue(MockResponse().setBody(chapterHtml))
-        val pages = source().getPageList(SChapter(url = "/comic/solo-leveling/chapter-110", name = "Chapter 110"))
+        val pages = source().getPageList(SChapter(url = "/comics/solo-leveling-6f7fe6eb/chapter/110", name = "Chapter 110"))
         assertEquals(1, pages.size)
-        assertEquals("https://tooning.asura/1.png", pages[0].imageUrl)
+        assertEquals("https://cdn.asurascans.com/asura-images/chapters/solo/110/a.webp", pages[0].imageUrl)
     }
 
     @Test
     fun `broken layout throws SourceLayoutChanged with manifest hint`() {
         server.enqueue(MockResponse().setBody("<html><body><p>completely new design</p></body></html>"))
         val error = assertThrows(SourceException::class.java) {
-            runBlocking { source().getPageList(SChapter(url = "/comic/x/chapter-1", name = "Chapter 1")) }
+            runBlocking { source().getPageList(SChapter(url = "/comics/x/chapter/1", name = "Chapter 1")) }
         }
         assertEquals(AppError.SourceLayoutChanged, error.error)
         assertTrue(error.message.orEmpty().contains("update the manifest"), error.message.orEmpty())

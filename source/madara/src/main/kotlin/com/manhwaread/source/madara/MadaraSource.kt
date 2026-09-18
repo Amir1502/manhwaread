@@ -25,14 +25,16 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Универсальный источник WordPress+Madara (manga18fx и сотни сайтов той же темы).
- * Контракт Source закреплён (AGENTS.md); url тайтлов/глав — пути от [baseUrl]
- * (формат MangaDex-источника).
+ * Универсальный источник WordPress-сайтов на темах Madara/MangaStream
+ * (manga18fx и сотни сайтов тех же тем). Контракт Source закреплён (AGENTS.md);
+ * url тайтлов/глав — пути от [baseUrl] (формат MangaDex-источника).
  *
- * - каталог: GET {mangaPath}/page/{n}/?m_orderby=views|latest;
- * - поиск: GET /page/{n}/?s={query}&post_type=wp-manga;
- * - главы: li.wp-manga-chapter со страницы тайтла, фолбэк — POST admin-ajax
- *   (manga_get_chapters) при [MadaraConfig.useAjaxChapters];
+ * - каталог: GET по шаблонам [MadaraConfig.popularPathTemplate] и
+ *   [MadaraConfig.latestPathTemplate] ({page} — номер страницы);
+ * - поиск: GET по [MadaraConfig.searchPathTemplate] + query-параметры
+ *   [MadaraConfig.searchQueryParam] и [MadaraConfig.searchExtraParams];
+ * - главы: li.wp-manga-chapter / li.a-h со страницы тайтла, фолбэк — POST
+ *   admin-ajax (manga_get_chapters) при [MadaraConfig.useAjaxChapters];
  * - возрастной гейт: заголовок Cookie из [MadaraConfig.adultCookie];
  * - пустая выдача там, где её быть не должно → SourceLayoutChanged
  *   (сайт сменил разметку, источник не падает необработанно).
@@ -51,24 +53,22 @@ class MadaraSource(
     override val isNsfw: Boolean = config.isNsfw
 
     override suspend fun getPopular(page: Int): MangasPage =
-        listPage("${config.baseUrl}${config.mangaPath}/page/$page/?m_orderby=${config.orderByPopular}")
+        listPage("${config.baseUrl}${withPage(config.popularPathTemplate, page)}")
 
     override suspend fun getLatest(page: Int): MangasPage =
-        listPage("${config.baseUrl}${config.mangaPath}/page/$page/?m_orderby=${config.orderByLatest}")
+        listPage("${config.baseUrl}${withPage(config.latestPathTemplate, page)}")
 
     override suspend fun search(query: String, filters: List<Filter>, page: Int): MangasPage {
         val trimmed = query.trim()
         // ФАЗА 13: текстовый поиск и Sort-фильтр; остальные фильтры подключит UI ФАЗЫ 14.
-        val orderBy = sortOrderBy(filters) ?: config.orderByPopular
         if (trimmed.isEmpty()) {
-            return listPage("${config.baseUrl}${config.mangaPath}/page/$page/?m_orderby=$orderBy")
+            val template = if (isLatestSort(filters)) config.latestPathTemplate else config.popularPathTemplate
+            return listPage("${config.baseUrl}${withPage(template, page)}")
         }
-        val url = "${config.baseUrl}/page/$page/".toHttpUrl().newBuilder()
-            .addQueryParameter("s", trimmed)
-            .addQueryParameter("post_type", "wp-manga")
-            .addQueryParameter("m_orderby", "relevance")
-            .build()
-        return listPage(url.toString())
+        val builder = "${config.baseUrl}${withPage(config.searchPathTemplate, page)}".toHttpUrl().newBuilder()
+            .addQueryParameter(config.searchQueryParam, trimmed)
+        config.searchExtraParams.forEach { (key, value) -> builder.addQueryParameter(key, value) }
+        return listPage(builder.build().toString())
     }
 
     override suspend fun getDetails(manga: SManga): SManga {
@@ -94,14 +94,15 @@ class MadaraSource(
         return pages
     }
 
-    private fun sortOrderBy(filters: List<Filter>): String? {
-        val sort = filters.filterIsInstance<Filter.Sort>().firstOrNull() ?: return null
-        return when (sort.selectedIndex) {
-            SORT_INDEX_POPULAR -> config.orderByPopular
-            SORT_INDEX_LATEST -> config.orderByLatest
-            else -> null
-        }
+    // Sort-фильтр: выбран пункт «последние обновления».
+    private fun isLatestSort(filters: List<Filter>): Boolean {
+        val sort = filters.filterIsInstance<Filter.Sort>().firstOrNull() ?: return false
+        return sort.selectedIndex == SORT_INDEX_LATEST
     }
+
+    // Подстановка номера страницы в шаблон каталога/поиска.
+    private fun withPage(template: String, page: Int): String =
+        template.replace(PAGE_PLACEHOLDER, page.toString())
 
     private suspend fun loadChaptersViaAjax(detailsDocument: Document): List<SChapter> {
         val holderId = MadaraHtml.chaptersHolderId(detailsDocument)
@@ -180,7 +181,7 @@ class MadaraSource(
     companion object {
         private const val MAX_CONCURRENT = 3
         private const val MIN_INTERVAL_MS = 300L
-        private const val SORT_INDEX_POPULAR = 0
+        private const val PAGE_PLACEHOLDER = "{page}"
         private const val SORT_INDEX_LATEST = 1
         private const val HEADER_COOKIE = "Cookie"
         private const val HEADER_RETRY_AFTER = "Retry-After"
