@@ -212,8 +212,8 @@ sealed interface ValidationResult {
 | 10 | Читалка: TiledImageView + OverlayLayer | ✅ выполнено |
 | 11 | Vision: OpenCV + ONNX + ML Kit OCR + Inpainting | ✅ выполнено |
 | 12 | Провайдеры перевода + Keystore + экраны настроек | ✅ выполнено |
-| 13 | Madara + Asura + Cloudflare WebView | 🔄 в работе |
-| 14 | UI: каталог, библиотека, история, загрузки, онбординг | ⬜ |
+| 13 | Madara + Asura + Cloudflare WebView | ✅ выполнено |
+| 14 | UI: каталог, библиотека, история, загрузки, онбординг | 🔄 в работе |
 | 15 | Очередь, офлайн, self-check, финал | ⬜ |
 
 ## Definition of Done (критерии готовности продукта)
