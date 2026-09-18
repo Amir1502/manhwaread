@@ -85,6 +85,15 @@ class FileChapterLoaderTest {
     }
 
     @Test
+    fun `corrupt overlays json still loads chapter without overlays`() = runBlocking {
+        writePage("page1.png")
+        File(tempDir, "overlays.json").writeText("{ это не массив спеков")
+        val chapter = loader().loadChapter(tempDir)
+        assertEquals(1, chapter.pages.size)
+        assertTrue(chapter.pages[0].overlays.isEmpty())
+    }
+
+    @Test
     fun `loading a plain file throws IllegalArgumentException`() {
         val file = File(tempDir, "not-a-dir.png")
         file.writeBytes(byteArrayOf(0))

@@ -1,5 +1,6 @@
 package com.manhwaread.feature.reader
 
+import com.manhwaread.core.vision.PointF
 import com.manhwaread.core.vision.RectF
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -7,6 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.float
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -55,6 +57,19 @@ object ChapterMetaJson {
         }
         put("originalText", bubble.originalText)
         bubble.translatedText?.let { translated -> put("translatedText", translated) }
+        // Подложка оверлея: форма, полигон и цвет фона бабла (аддитивно).
+        put("shape", bubble.shape.name)
+        putJsonArray("polygon") {
+            bubble.polygon.forEach { point ->
+                add(
+                    buildJsonObject {
+                        put("x", point.x)
+                        put("y", point.y)
+                    },
+                )
+            }
+        }
+        bubble.fillColorArgb?.let { fill -> put("fillColorArgb", fill) }
     }
 
     private fun bubbleFromJson(json: JsonObject): BubbleHitArea {
@@ -70,6 +85,17 @@ object ChapterMetaJson {
             ),
             originalText = json.stringOf("originalText"),
             translatedText = json["translatedText"]?.jsonPrimitive?.contentOrNull,
+            // Старые chapter.json без полей подложки читаются с дефолтами.
+            shape = json["shape"]?.jsonPrimitive?.contentOrNull
+                ?.let { name -> runCatching { BubbleMaskShape.valueOf(name) }.getOrNull() }
+                ?: BubbleMaskShape.ELLIPSE,
+            polygon = json["polygon"]?.jsonArray
+                ?.map { element ->
+                    val point = element.jsonObject
+                    PointF(x = point.floatOf("x"), y = point.floatOf("y"))
+                }
+                .orEmpty(),
+            fillColorArgb = json["fillColorArgb"]?.jsonPrimitive?.intOrNull,
         )
     }
 

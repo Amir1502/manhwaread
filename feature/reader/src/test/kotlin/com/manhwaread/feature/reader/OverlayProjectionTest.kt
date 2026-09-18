@@ -6,6 +6,7 @@ import com.manhwaread.core.vision.PointF
 import com.manhwaread.core.vision.RectF
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class OverlayProjectionTest {
@@ -84,8 +85,71 @@ class OverlayProjectionTest {
         assertEquals("b1", hit?.bubbleId)
     }
 
+    @Test
+    fun `backgrounds keep only translated bubbles`() {
+        val transform = ViewportTransform(scale = 1f, offsetX = 0f, offsetY = 0f)
+        val bubbles = listOf(
+            bubble("b1", RectF(0f, 0f, 10f, 10f)),
+            bubble("b2", RectF(20f, 20f, 30f, 30f)),
+        )
+        // Переведён только b1 (есть OverlaySpec); b2 без перевода — без подложки.
+        val backgrounds = projectBackgrounds(listOf(spec()), bubbles, transform)
+        assertEquals(1, backgrounds.size)
+        assertEquals("b1", backgrounds[0].bubbleId)
+    }
+
+    @Test
+    fun `background with no overlay yields nothing`() {
+        val transform = ViewportTransform(scale = 1f, offsetX = 0f, offsetY = 0f)
+        val backgrounds = projectBackgrounds(
+            overlays = emptyList(),
+            bubbles = listOf(bubble("b1", RectF(0f, 0f, 10f, 10f))),
+            transform = transform,
+        )
+        assertTrue(backgrounds.isEmpty())
+    }
+
+    @Test
+    fun `ellipse background projects bounds with scale and offset`() {
+        val transform = ViewportTransform(scale = 2f, offsetX = 5f, offsetY = -7f)
+        val backgrounds = projectBackgrounds(
+            overlays = listOf(spec()),
+            bubbles = listOf(bubble("b1", RectF(10f, 20f, 30f, 40f))),
+            transform = transform,
+        )
+        val bg = backgrounds.single()
+        assertEquals(BubbleMaskShape.ELLIPSE, bg.shape)
+        assertEquals(25f, bg.left, EPS)
+        assertEquals(33f, bg.top, EPS)
+        assertEquals(65f, bg.right, EPS)
+        assertEquals(73f, bg.bottom, EPS)
+        assertTrue(bg.polygon.isEmpty())
+        // Цвет по умолчанию — белый, когда fillColorArgb не задан.
+        assertEquals(WHITE, bg.colorArgb)
+    }
+
+    @Test
+    fun `polygon background projects points and keeps fill color`() {
+        val transform = ViewportTransform(scale = 2f, offsetX = 0f, offsetY = 0f)
+        val hit = bubble("b1", RectF(0f, 0f, 10f, 10f)).copy(
+            shape = BubbleMaskShape.POLYGON,
+            polygon = listOf(PointF(1f, 2f), PointF(3f, 4f), PointF(5f, 6f)),
+            fillColorArgb = FILL,
+        )
+        val bg = projectBackgrounds(listOf(spec()), listOf(hit), transform).single()
+        assertEquals(BubbleMaskShape.POLYGON, bg.shape)
+        assertEquals(FILL, bg.colorArgb)
+        assertEquals(3, bg.polygon.size)
+        assertEquals(2f, bg.polygon[0].x, EPS)
+        assertEquals(4f, bg.polygon[0].y, EPS)
+        assertEquals(10f, bg.polygon[2].x, EPS)
+        assertEquals(12f, bg.polygon[2].y, EPS)
+    }
+
     private companion object {
         const val EPS = 0.0001f
         val BLACK = 0xFF000000.toInt()
+        val WHITE = 0xFFFFFFFF.toInt()
+        val FILL = 0xFF123456.toInt()
     }
 }

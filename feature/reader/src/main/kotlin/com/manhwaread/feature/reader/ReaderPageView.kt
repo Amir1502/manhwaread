@@ -29,6 +29,11 @@ fun ReaderPageView(
     val projectedLines = remember(page.overlays, transform) {
         page.overlays.flatMap { spec -> spec.project(transform) }
     }
+    // Маскирующие подложки пересчитываются вместе со строками перевода:
+    // фигура бабла обязана совпадать с текстом на любом зуме/сдвиге.
+    val projectedBackgrounds = remember(page.overlays, page.bubbles, transform) {
+        projectBackgrounds(page.overlays, page.bubbles, transform)
+    }
     val isZoomedIn = rememberUpdatedState(transform.scale > baseScale * ZOOMED_EPSILON)
     Box(
         modifier = modifier
@@ -58,6 +63,7 @@ fun ReaderPageView(
         AndroidView(
             factory = { context -> OverlayLayerView(context) },
             update = { view ->
+                view.setBackgrounds(projectedBackgrounds)
                 view.setOverlayLines(projectedLines)
                 view.setOverlayVisible(showOverlay)
             },

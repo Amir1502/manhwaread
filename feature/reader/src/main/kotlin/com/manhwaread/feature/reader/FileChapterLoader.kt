@@ -16,7 +16,10 @@ class FileChapterLoader(
     override suspend fun loadChapter(chapterDir: File): ReaderChapter = withContext(ioDispatcher) {
         require(chapterDir.isDirectory) { "not a directory: ${chapterDir.path}" }
         val meta = ChapterMetaJson.decode(readIfExists(File(chapterDir, META_FILE)))
-        val overlays = OverlaySpecJson.decode(readIfExists(File(chapterDir, OVERLAY_FILE)))
+        // Битый overlays.json не должен мешать чтению оригинала: слой
+        // перевода теряется, но глава открывается.
+        val overlays = runCatching { OverlaySpecJson.decode(readIfExists(File(chapterDir, OVERLAY_FILE))) }
+            .getOrDefault(emptyList())
         val overlaysByPage = overlays.groupBy { it.pageIndex }
         val bubblesByPage = meta.bubbles.groupBy { it.pageIndex }
         val pages = pageFiles(chapterDir).mapIndexed { index, file ->

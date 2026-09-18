@@ -1,6 +1,7 @@
 package com.manhwaread.feature.reader
 
 import com.manhwaread.core.vision.OverlaySpec
+import com.manhwaread.core.vision.PointF
 import com.manhwaread.core.vision.RectF
 import java.io.File
 
@@ -29,6 +30,19 @@ data class ProjectedOverlayLine(
     val fontFamily: String?,
 )
 
+// Маскирующая подложка переведённого бабла в экранных координатах:
+// OverlayLayerView рисует её под строками перевода, закрывая оригинал.
+data class ProjectedOverlayBackground(
+    val bubbleId: String,
+    val shape: BubbleMaskShape,
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float,
+    val polygon: List<PointF>,
+    val colorArgb: Int,
+)
+
 // Колбэки жестов страницы: сгруппированы, чтобы уложиться в порог
 // числа параметров detekt и не плодить лямбды в сигнатуре.
 data class ReaderPageActions(
@@ -38,15 +52,23 @@ data class ReaderPageActions(
     val onDoubleTapZoom: (x: Float, y: Float) -> Unit,
 )
 
+// Форма маскирующей подложки оверлея перевода: читалка закрывает бабл
+// этой фигурой, чтобы перевод читался на чистом фоне (оригинал не виден).
+enum class BubbleMaskShape { ELLIPSE, RECT, POLYGON }
+
 // Область бабла для тапа: границы в пикселях страницы + пара текстов
 // (оригинал и перевод) для карточки по тапу (DoD: «тап по баблу →
-// оригинал + перевод»).
+// оригинал + перевод»). Поля подложки (shape/polygon/fillColorArgb) —
+// аддитивное расширение: старые chapter.json без них читаются с дефолтами.
 data class BubbleHitArea(
     val bubbleId: String,
     val pageIndex: Int,
     val bounds: RectF,
     val originalText: String,
     val translatedText: String?,
+    val shape: BubbleMaskShape = BubbleMaskShape.ELLIPSE,
+    val polygon: List<PointF> = emptyList(),
+    val fillColorArgb: Int? = null,
 )
 
 // Страница, готовая к рендеру: файл + размеры (нужны для раскладки ДО
@@ -75,12 +97,13 @@ data class SelectedBubble(
     val translatedText: String?,
 )
 
-// UI-состояние читалки: контент, режим, видимость оверлея, трансформации
-// страниц (зум/панорамирование живут здесь и переживают поворот экрана).
+// UI-состояние читалки: контент, режим, видимость оверлея и панелей,
+// трансформации страниц (зум/панорамирование живут здесь и переживают поворот экрана).
 data class ReaderUiState(
     val chapter: ReaderChapter? = null,
     val mode: ReaderMode = ReaderMode.WEBTOON,
     val showOverlay: Boolean = true,
+    val chromeVisible: Boolean = true,
     val currentPageIndex: Int = 0,
     val transforms: Map<Int, ViewportTransform> = emptyMap(),
     val viewportWidthPx: Float = 0f,

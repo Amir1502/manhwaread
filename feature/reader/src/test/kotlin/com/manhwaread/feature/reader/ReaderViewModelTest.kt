@@ -182,6 +182,39 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun `miss tap toggles chrome when sheet is closed`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        assertTrue(viewModel.uiState.value.chromeVisible)
+        // Тап мимо бабла (900, 2000): лист закрыт — панели скрываются.
+        viewModel.onTap(pageIndex = 0, x = 900f, y = 2000f)
+        assertFalse(viewModel.uiState.value.chromeVisible)
+        // Повторный тап мимо — панели возвращаются.
+        viewModel.onTap(pageIndex = 0, x = 900f, y = 2000f)
+        assertTrue(viewModel.uiState.value.chromeVisible)
+    }
+
+    @Test
+    fun `bubble tap does not change chrome`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.onTap(pageIndex = 0, x = 100f, y = 100f)
+        assertEquals("b1", viewModel.uiState.value.selectedBubble?.bubbleId)
+        assertTrue(viewModel.uiState.value.chromeVisible)
+    }
+
+    @Test
+    fun `miss tap with open sheet only closes it and keeps chrome`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.onTap(pageIndex = 0, x = 100f, y = 100f)
+        viewModel.onTap(pageIndex = 0, x = 900f, y = 2000f)
+        assertNull(viewModel.uiState.value.selectedBubble)
+        // Первый промах закрыл лист, chrome не тронут.
+        assertTrue(viewModel.uiState.value.chromeVisible)
+    }
+
+    @Test
     fun `double tap zooms to 2_5x and back to base`() = runTest {
         val viewModel = viewModelReturning(chapter())
         val state = viewModel.openedChapter()

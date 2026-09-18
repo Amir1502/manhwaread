@@ -120,21 +120,25 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    // Тап по странице: поиск бабла и карточка «оригинал + перевод».
+    // Тап по странице: попадание по баблу открывает карточку «оригинал + перевод».
+    // Промах сначала закрывает открытую карточку и только затем переключает
+    // видимость панелей читалки (immersive-режим полного экрана).
     fun onTap(pageIndex: Int, x: Float, y: Float) {
         val state = _uiState.value
         val page = state.chapter?.pages?.getOrNull(pageIndex) ?: return
         val hit = hitTestBubble(x, y, state.transformFor(pageIndex), page.bubbles)
         _uiState.update { current ->
-            current.copy(
-                selectedBubble = hit?.let { area ->
-                    SelectedBubble(
-                        bubbleId = area.bubbleId,
-                        originalText = area.originalText,
-                        translatedText = area.translatedText,
-                    )
-                },
-            )
+            when {
+                hit != null -> current.copy(
+                    selectedBubble = SelectedBubble(
+                        bubbleId = hit.bubbleId,
+                        originalText = hit.originalText,
+                        translatedText = hit.translatedText,
+                    ),
+                )
+                current.selectedBubble != null -> current.copy(selectedBubble = null)
+                else -> current.copy(chromeVisible = !current.chromeVisible)
+            }
         }
     }
 

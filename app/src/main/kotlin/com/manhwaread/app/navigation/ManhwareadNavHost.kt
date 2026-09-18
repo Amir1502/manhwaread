@@ -47,6 +47,9 @@ private const val ARG_MANGA_URL = "mangaUrl"
 private const val READER_ROUTE = "reader/{mangaId}/{chapterId}"
 private const val ARG_CHAPTER_ID = "chapterId"
 
+// Префикс маршрута читалки: на нём нижняя навигация скрыта (полный экран).
+private const val READER_ROUTE_PREFIX = "reader"
+
 // Корень приложения: гейт онбординга + Scaffold с нижней навигацией.
 @Composable
 fun ManhwareadRoot(viewModel: RootViewModel = hiltViewModel()) {
@@ -64,12 +67,17 @@ private fun MainScaffold() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    // Читалка — полноэкранная: на её маршруте нижняя навигация не показывается,
+    // innerPadding снизу становится нулевым и контент занимает весь экран.
+    val isReaderRoute = currentRoute?.startsWith(READER_ROUTE_PREFIX) == true
     Scaffold(
         bottomBar = {
-            ManhwareadBottomBar(
-                currentRoute = currentRoute,
-                onTabSelected = { destination -> navController.navigateToTab(destination) },
-            )
+            if (!isReaderRoute) {
+                ManhwareadBottomBar(
+                    currentRoute = currentRoute,
+                    onTabSelected = { destination -> navController.navigateToTab(destination) },
+                )
+            }
         },
     ) { innerPadding ->
         ManhwareadNavHost(

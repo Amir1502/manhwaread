@@ -48,6 +48,8 @@ dependencies {
     // OverlaySpec/RectF входят в публичные сигнатуры читалки — зависимость api.
     api(project(":core:vision-model"))
 
+    // WindowInsetsControllerCompat (immersive-полноэкран читалки).
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)

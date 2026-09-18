@@ -1,5 +1,6 @@
 package com.manhwaread.feature.reader
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,8 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -65,6 +70,7 @@ fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    ImmersiveSystemBarsEffect()
     LaunchedEffect(chapterDir, initialPageIndex) {
         if (chapterDir != null) {
             viewModel.openChapter(chapterDir, initialPageIndex)
@@ -76,22 +82,26 @@ fun ReaderScreen(
         }
     }
     Scaffold(
+        // Панели читалки рендерятся только при видимом chrome: тап мимо бабла
+        // скрывает их, повторный тап возвращает (полноэкранное чтение).
         topBar = {
-            TopAppBar(
-                title = { Text(state.chapter?.title.orEmpty()) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.reader_back),
-                        )
-                    }
-                },
-            )
+            if (state.chromeVisible) {
+                TopAppBar(
+                    title = { Text(state.chapter?.title.orEmpty()) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.reader_back),
+                            )
+                        }
+                    },
+                )
+            }
         },
         bottomBar = {
             val chapter = state.chapter
-            if (chapter != null && chapter.pages.isNotEmpty()) {
+            if (state.chromeVisible && chapter != null && chapter.pages.isNotEmpty()) {
                 ReaderBottomBar(state = state, pageCount = chapter.pages.size, viewModel = viewModel)
             }
         },
@@ -106,6 +116,24 @@ fun ReaderScreen(
             state.selectedBubble?.let { bubble ->
                 ReaderBubbleSheet(bubble = bubble, onDismiss = viewModel::dismissBubbleSheet)
             }
+        }
+    }
+}
+
+// Immersive-полноэкран: пока читалка в композиции, системные бары скрыты,
+// свайп показывает их временно; при выходе со экрана бары возвращаются.
+@Composable
+private fun ImmersiveSystemBarsEffect() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { activityWindow -> WindowInsetsControllerCompat(activityWindow, view) }
+        if (controller != null) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 }
