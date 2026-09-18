@@ -34,8 +34,8 @@ class MlKitOcrEngine(
 }
 
 // Мультязыковой OCR: прогоняет все движки (ko, ja, latin) по одному кадру,
-// объединяет и дедуплицирует строки по IoU. Отказ одного языка не роняет
-// стадию; отказ всех — ошибка VisionFailed.
+// объединяет, отфильтровывает мусор CJK-движков и дедуплицирует строки по IoU.
+// Отказ одного языка не роняет стадию; отказ всех — ошибка VisionFailed.
 class MultiLangOcrEngine(private val engines: List<OcrEngine>) : OcrEngine {
     override suspend fun recognize(bitmap: Bitmap, pageIndex: Int): List<OcrLine> {
         val results = engines.map { engine -> runCatching { engine.recognize(bitmap, pageIndex) } }
@@ -44,6 +44,8 @@ class MultiLangOcrEngine(private val engines: List<OcrEngine>) : OcrEngine {
             val firstError = results.firstNotNullOfOrNull { result -> result.exceptionOrNull() }
             throw firstError ?: VisionException("no OCR engines configured")
         }
-        return dedupeOcrLines(succeeded.flatten())
+        // Мусор фильтруется ДО дедупликации: высоконадёжная мусорная строка KO/JA
+        // иначе вытеснит по IoU корректную латинскую строку в тех же границах.
+        return dedupeOcrLines(dropCjkEngineJunk(succeeded.flatten()))
     }
 }

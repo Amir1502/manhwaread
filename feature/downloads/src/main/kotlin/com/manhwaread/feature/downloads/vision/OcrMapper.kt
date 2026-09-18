@@ -84,4 +84,25 @@ fun dedupeOcrLines(lines: List<OcrLine>, iouThreshold: Float = DEDUPE_IOU_THRESH
     return kept
 }
 
+// CJK-фильтр мультязыкового OCR: на латинских страницах (например, испанский
+// сканлейт) движки KO/JA выдают мусор — строки без CJK-символов отбрасываются.
+private val HANGUL_JAMO_RANGE = '\u1100'..'\u11FF'
+private val HANGUL_COMPAT_JAMO_RANGE = '\u3130'..'\u318F'
+private val HANGUL_SYLLABLES_RANGE = '\uAC00'..'\uD7AF'
+private val KANA_RANGE = '\u3040'..'\u30FF'
+private val CJK_UNIFIED_RANGE = '\u4E00'..'\u9FFF'
+
+private val CJK_RANGES =
+    listOf(HANGUL_JAMO_RANGE, HANGUL_COMPAT_JAMO_RANGE, HANGUL_SYLLABLES_RANGE, KANA_RANGE, CJK_UNIFIED_RANGE)
+
+// Языки «CJK-движков»: их строки достоверны только при наличии CJK-символов.
+private val CJK_ENGINE_LANGS = setOf(DetectedLang.KO, DetectedLang.JA)
+
+// Содержит ли текст хотя бы один CJK-символ (хангыль, кана, унифицированные иероглифы).
+fun containsCjk(text: String): Boolean = text.any { char -> CJK_RANGES.any { range -> char in range } }
+
+// Строки движков KO/JA без CJK-символов отбрасываются; строки EN/UNKNOWN не трогаются.
+fun dropCjkEngineJunk(lines: List<OcrLine>): List<OcrLine> =
+    lines.filter { line -> line.lang !in CJK_ENGINE_LANGS || containsCjk(line.text) }
+
 private const val LANG_PREFIX_LENGTH = 2

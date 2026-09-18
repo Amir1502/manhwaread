@@ -1,9 +1,11 @@
 package com.manhwaread.feature.downloads.queue
 
 import com.manhwaread.core.vision.Bubble
+import com.manhwaread.core.vision.BubbleKind
 import com.manhwaread.core.vision.OverlaySpec
 import com.manhwaread.core.vision.TextSegment
 import com.manhwaread.feature.reader.BubbleHitArea
+import com.manhwaread.feature.reader.BubbleMaskShape
 import com.manhwaread.feature.reader.ChapterMeta
 import com.manhwaread.feature.reader.ChapterMetaJson
 import com.manhwaread.feature.reader.OverlaySpecJson
@@ -40,24 +42,39 @@ class ChapterArchiveWriter(
             File(dir, FileOverlayStore.OVERLAYS_FILE_NAME).writeText(OverlaySpecJson.encode(specs))
         }
 
-    // Контент карточки бабла: оригинал — сегменты бабла в порядке чтения,
-    // перевод — строки векторного слоя (единственный источник переведённого текста).
+    // Контент карточки бабла: оригинал — сегменты в порядке чтения; перевод —
+    // цельный текст сегментов, запасной вариант — строки векторного слоя.
     private fun hitArea(bubble: Bubble, segments: List<TextSegment>, specs: List<OverlaySpec>): BubbleHitArea {
-        val original = segments
+        val bubbleSegments = segments
             .filter { segment -> segment.bubbleId == bubble.id }
             .sortedBy { segment -> segment.readingOrder }
-            .joinToString(SEPARATOR) { segment -> segment.ocrText }
-        val translated = specs
+        val original = bubbleSegments.joinToString(SEPARATOR) { segment -> segment.ocrText }
+        val fromSegments = bubbleSegments
+            .mapNotNull { segment -> segment.translatedText?.takeIf { text -> text.isNotBlank() } }
+            .joinToString(SEPARATOR)
+        val fromSpec = specs
             .firstOrNull { spec -> spec.bubbleId == bubble.id }
             ?.lines
             ?.joinToString(SEPARATOR) { line -> line.text }
+            .orEmpty()
+        val translated = fromSegments.ifBlank { fromSpec }
         return BubbleHitArea(
             bubbleId = bubble.id,
             pageIndex = bubble.pageIndex,
             bounds = bubble.bounds,
             originalText = original,
-            translatedText = translated?.takeIf { text -> text.isNotBlank() },
+            translatedText = translated.takeIf { text -> text.isNotBlank() },
+            shape = shapeOf(bubble),
+            polygon = bubble.polygon,
+            fillColorArgb = bubble.fillColor,
         )
+    }
+
+    // Форма подложки читалки — то же правило, что и выбор маски в TypesettingCompositor.
+    private fun shapeOf(bubble: Bubble): BubbleMaskShape = when {
+        bubble.polygon.size >= MIN_POLYGON_POINTS -> BubbleMaskShape.POLYGON
+        bubble.kind == BubbleKind.NARRATION_BOX -> BubbleMaskShape.RECT
+        else -> BubbleMaskShape.ELLIPSE
     }
 
     private fun writeMeta(dir: File, meta: ChapterMeta) {
@@ -67,5 +84,6 @@ class ChapterArchiveWriter(
     companion object {
         const val META_FILE_NAME = "chapter.json"
         private const val SEPARATOR = "\n"
+        private const val MIN_POLYGON_POINTS = 3
     }
 }

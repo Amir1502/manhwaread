@@ -16,6 +16,20 @@ import com.manhwaread.core.vision.TextSegment
 import com.manhwaread.core.vision.buildOverlay
 import com.manhwaread.core.vision.fit
 
+// Пригодность перевода сегмента: целевой язык — русский, поэтому текст без
+// кириллицы (транслитерация OCR-мусора) и эхо оригинала не используются.
+internal fun isUsableTranslation(ocrText: String, translated: String): Boolean {
+    if (translated.isBlank()) return false
+    if (normalizeForEchoCheck(ocrText).equals(normalizeForEchoCheck(translated), ignoreCase = true)) return false
+    return translated.any { char -> char in CYRILLIC_RANGE }
+}
+
+// Нормализация для сравнения на эхо: trim + схлопывание пробельных серий.
+private fun normalizeForEchoCheck(text: String): String = text.trim().replace(WHITESPACE_RUN, " ")
+
+private val CYRILLIC_RANGE = '\u0400'..'\u04FF'
+private val WHITESPACE_RUN = Regex("\\s+")
+
 /**
  * Стадия COMPOSITING (ФАЗА 15): перевод сегментов главы → векторный оверлей.
  * Перевод НЕ запекается в растр (ключевое решение продукта): по геометрии
@@ -48,12 +62,14 @@ class TypesettingCompositor(
         translatedById: Map<String, String>,
     ): OverlaySpec? {
         if (bubbleSegments.isEmpty()) return null
-        // Сегменты бабла в порядке чтения; перенос строки сохраняет смысл реплик,
-        // fit() токенизирует по пробельным символам и переносит слова сам.
+        // Сегменты бабла в порядке чтения; непригодные переводы (эхо оригинала,
+        // текст без кириллицы) исключаются из джойна — мусор не попадает в оверлей.
         val text = bubbleSegments
             .sortedBy { segment -> segment.readingOrder }
-            .mapNotNull { segment -> translatedById[segment.id] }
-            .filter { translated -> translated.isNotBlank() }
+            .mapNotNull { segment ->
+                translatedById[segment.id]
+                    ?.takeIf { translated -> isUsableTranslation(segment.ocrText, translated) }
+            }
             .joinToString(SEGMENT_SEPARATOR)
         if (text.isBlank()) return null
         val mask = maskFor(bubble)

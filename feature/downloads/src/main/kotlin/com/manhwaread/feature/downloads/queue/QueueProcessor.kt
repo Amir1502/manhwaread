@@ -167,17 +167,19 @@ class QueueProcessor(
             )
             return true
         }
-        val result = ChapterPipelineCoordinator(data.jobDao, pipelineStages(provider)).run(job.id)
+        val result = ChapterPipelineCoordinator(data.jobDao, pipelineStages(provider, job.ref.chapterId)).run(job.id)
         if (result.getOrNull() != null) {
             writeTranslatedArchive(job.ref.chapterId)
         }
         return true
     }
 
-    private fun pipelineStages(provider: TranslationProvider) = PipelineStages(
+    // Перевод записывается обратно в SegmentStore декоратором: писатель архива
+    // берёт для карточки бабла цельный текст сегментов, а не строки оверлея.
+    private fun pipelineStages(provider: TranslationProvider, chapterId: Long) = PipelineStages(
         downloader = SourceChapterDownloader(components.registry, components.httpClient, components.pageStore),
         analyzer = SegmentPersistingAnalyzer(components.analyzer, components.segmentStore),
-        translator = ProviderSegmentTranslator(provider),
+        translator = SegmentPersistingTranslator(ProviderSegmentTranslator(provider), components.segmentStore, chapterId),
         compositor = components.compositor,
         overlays = components.overlayStore,
     )

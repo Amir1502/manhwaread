@@ -1,6 +1,7 @@
 package com.manhwaread.feature.downloads.queue
 
 import com.manhwaread.core.common.AppError
+import com.manhwaread.core.common.DomainResult
 import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.DownloadTaskEntity
 import com.manhwaread.core.database.MangaEntity
@@ -10,7 +11,10 @@ import com.manhwaread.core.model.DownloadStatus
 import com.manhwaread.core.pipeline.InMemoryOverlayStore
 import com.manhwaread.core.pipeline.InMemorySegmentStore
 import com.manhwaread.core.pipeline.StageStatus
+import com.manhwaread.core.translation.TranslatedSegment
 import com.manhwaread.core.translation.TranslationProviderFactory
+import com.manhwaread.core.vision.DetectedLang
+import com.manhwaread.core.vision.TextSegment
 import com.manhwaread.feature.downloads.vision.InMemoryBubbleStore
 import com.manhwaread.source.api.InMemorySourceRegistry
 import com.manhwaread.source.api.Page
@@ -43,6 +47,7 @@ class QueueProcessorTest {
     private val apiKeyStore = FakeQueueApiKeyStore()
     private val analyzer = FakeQueueAnalyzer()
     private val compositor = FakeQueueCompositor()
+    private val segmentStore = InMemorySegmentStore()
     private lateinit var source: FakePageSource
     private lateinit var dirs: ChapterDirs
     private lateinit var processor: QueueProcessor
@@ -62,7 +67,7 @@ class QueueProcessorTest {
             registry = registry,
             httpClient = OkHttpClient(),
             pageStore = FilePageStore(dirs, Dispatchers.Unconfined),
-            segmentStore = InMemorySegmentStore(),
+            segmentStore = segmentStore,
             overlayStore = InMemoryOverlayStore(),
             bubbleStore = InMemoryBubbleStore(),
             analyzer = analyzer,
@@ -195,6 +200,40 @@ class QueueProcessorTest {
     }
 
     @Test
+    fun `translation job persists translated segments to store`() = runTest {
+        val (mangaId, chapterId) = seedChapter()
+        settingsStore.updateTranslation(
+            TranslationSettings(
+                providerId = OPENAI_COMPAT_PROVIDER_ID,
+                baseUrl = server.url("/v1").toString(),
+                model = "test-model",
+            ),
+        )
+        apiKeyStore.saveApiKey(OPENAI_COMPAT_PROVIDER_ID, "test-key")
+        jobDao.upsertEntity(
+            TranslationJobEntity(
+                id = "translate-$chapterId",
+                sourceId = 7L,
+                mangaId = mangaId,
+                chapterId = chapterId,
+                chapterUrl = "/ch/10",
+                createdAt = 1L,
+            ),
+        )
+        analyzer.outcome = DomainResult.success(listOf(koSegment("s1")))
+        seedPages(count = 1)
+        server.enqueue(MockResponse().setBody(chatCompletion("""[{"id":"s1","text":"Привет"}]""")))
+
+        assertTrue(processor.processNextTranslationJob())
+
+        assertEquals(StageStatus.DONE, jobDao.findEntityById("translate-$chapterId")?.status)
+        // После задачи перевода сегменты в сторе имеют translatedText.
+        val saved = segmentStore.loadSegments(chapterId)
+        assertEquals("Привет", saved.single().translatedText)
+        assertEquals(listOf(TranslatedSegment("s1", "Привет")), compositor.lastTranslated)
+    }
+
+    @Test
     fun `requeue stalled jobs respects attempts and terminal statuses`() = runTest {
         jobDao.upsertEntity(jobEntity("j-failed-once", StageStatus.FAILED, attempts = 1))
         jobDao.upsertEntity(jobEntity("j-failed-max", StageStatus.FAILED, attempts = MAX_ATTEMPTS_LIMIT))
@@ -228,6 +267,22 @@ class QueueProcessorTest {
         assertNull(File(dirs.dirFor(chapterId), ChapterArchiveWriter.META_FILE_NAME).takeIf { file -> file.isFile })
     }
 
+    private fun koSegment(id: String) = TextSegment(
+        id = id,
+        bubbleId = "b1",
+        pageIndex = 0,
+        ocrText = "안녕",
+        ocrLang = DetectedLang.KO,
+        ocrConfidence = 1f,
+        readingOrder = 0,
+    )
+
+    // Конверт OpenAI-совместимого ответа: content — JSON-массив сегментов перевода.
+    private fun chatCompletion(segmentsJson: String): String {
+        val escaped = segmentsJson.replace("\\", "\\\\").replace("\"", "\\\"")
+        return """{"choices":[{"message":{"role":"assistant","content":"$escaped"}}]}"""
+    }
+
     private fun jobEntity(id: String, status: StageStatus, attempts: Int) = TranslationJobEntity(
         id = id,
         sourceId = 7L,
@@ -241,5 +296,6 @@ class QueueProcessorTest {
 
     private companion object {
         const val MAX_ATTEMPTS_LIMIT = 3
+        const val OPENAI_COMPAT_PROVIDER_ID = "openai-compat"
     }
 }

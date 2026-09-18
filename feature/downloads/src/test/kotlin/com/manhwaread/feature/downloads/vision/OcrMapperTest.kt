@@ -3,7 +3,9 @@ package com.manhwaread.feature.downloads.vision
 import com.manhwaread.core.vision.DetectedLang
 import com.manhwaread.core.vision.RectF
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class OcrMapperTest {
@@ -86,6 +88,54 @@ class OcrMapperTest {
     fun `iou with degenerate rect is zero`() {
         assertEquals(0f, iou(RectF(5f, 5f, 5f, 5f), RectF(0f, 0f, 10f, 10f)), EPS)
     }
+
+    @Test
+    fun `containsCjk recognizes hangul jamo compat and syllables`() {
+        assertTrue(containsCjk("\u1100\u1161"))
+        assertTrue(containsCjk("\u3131"))
+        assertTrue(containsCjk("안녕"))
+        assertFalse(containsCjk("TODAVÍA"))
+    }
+
+    @Test
+    fun `containsCjk recognizes kana and unified ideographs`() {
+        assertTrue(containsCjk("ドン"))
+        assertTrue(containsCjk("漫画"))
+        assertTrue(containsCjk("mixed 안녕"))
+        assertFalse(containsCjk("  123 !? "))
+    }
+
+    @Test
+    fun `spanish line tagged KO is dropped as junk`() {
+        val junk = ocrLine("TODAVÍA NO", DetectedLang.KO)
+        assertTrue(dropCjkEngineJunk(listOf(junk)).isEmpty())
+    }
+
+    @Test
+    fun `hangul line tagged KO is kept`() {
+        val hangul = ocrLine("안녕하세요", DetectedLang.KO)
+        assertEquals(listOf(hangul), dropCjkEngineJunk(listOf(hangul)))
+    }
+
+    @Test
+    fun `spanish line tagged JA is dropped while kana and ideographs are kept`() {
+        val junk = ocrLine("TODAVÍA", DetectedLang.JA)
+        val kana = ocrLine("ドン", DetectedLang.JA)
+        val ideographs = ocrLine("漫画", DetectedLang.JA)
+        val kept = dropCjkEngineJunk(listOf(junk, kana, ideographs))
+        assertEquals(listOf(kana, ideographs), kept)
+    }
+
+    @Test
+    fun `EN and UNKNOWN lines are untouched by junk filter`() {
+        val en = ocrLine("TODAVÍA", DetectedLang.EN)
+        val unknown = ocrLine("12345", DetectedLang.UNKNOWN)
+        val zh = ocrLine("TODAVÍA", DetectedLang.ZH)
+        assertEquals(listOf(en, unknown, zh), dropCjkEngineJunk(listOf(en, unknown, zh)))
+    }
+
+    private fun ocrLine(text: String, lang: DetectedLang) =
+        OcrLine(text = text, bounds = RectF(0f, 0f, 10f, 10f), confidence = 0.9f, lang = lang)
 
     private companion object {
         const val EPS = 0.0001f

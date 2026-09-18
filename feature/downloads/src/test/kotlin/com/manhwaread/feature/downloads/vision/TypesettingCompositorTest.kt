@@ -15,6 +15,7 @@ import com.manhwaread.core.vision.RectMask
 import com.manhwaread.core.vision.TextSegment
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -142,5 +143,55 @@ class TypesettingCompositorTest {
         assertTrue(compositor.maskFor(bubble("n", kind = BubbleKind.NARRATION_BOX)) is RectMask)
         assertTrue(compositor.maskFor(bubble("s", kind = BubbleKind.SPEECH)) is EllipseMask)
         assertTrue(compositor.maskFor(bubble("t", kind = BubbleKind.THOUGHT)) is EllipseMask)
+    }
+
+    @Test
+    fun `echo of original after normalization is not a translation`() {
+        assertFalse(isUsableTranslation("  Hola   mundo ", "hola MUNDO"))
+        assertFalse(isUsableTranslation("TODAVÍA", "TODAVÍA"))
+    }
+
+    @Test
+    fun `translation without cyrillic is rejected`() {
+        assertFalse(isUsableTranslation("TODAVÍA", "TODAVIYA"))
+        assertFalse(isUsableTranslation("TODAVÍA", "todavía"))
+        assertFalse(isUsableTranslation("안녕", "   "))
+    }
+
+    @Test
+    fun `normal russian translation passes`() {
+        assertTrue(isUsableTranslation("안녕", "Привет"))
+        assertTrue(isUsableTranslation("Hola mundo", "Привет, мир!"))
+    }
+
+    @Test
+    fun `bubble of junk translations yields no spec`() = runTest {
+        bubbleStore.saveBubbles(10L, listOf(bubble("b1"), bubble("b2")))
+        val specs = compositor.composite(
+            job,
+            segments = listOf(
+                segment("s1", "b1", order = 0, text = "TODAVÍA"),
+                segment("s2", "b2", order = 0, text = "안녕"),
+            ),
+            // b1 — транслитерация мусора без кириллицы, b2 — эхо оригинала.
+            translated = listOf(TranslatedSegment("s1", "TODAVIYA"), TranslatedSegment("s2", "안녕")),
+        ).getOrNull()
+        assertTrue(requireNotNull(specs).isEmpty())
+    }
+
+    @Test
+    fun `unusable segments are excluded from bubble join`() = runTest {
+        bubbleStore.saveBubbles(10L, listOf(bubble("b1")))
+        val specs = compositor.composite(
+            job,
+            segments = listOf(
+                segment("s1", "b1", order = 0, text = "안녕"),
+                segment("s2", "b1", order = 1, text = "TODAVÍA"),
+            ),
+            translated = listOf(TranslatedSegment("s1", "Привет"), TranslatedSegment("s2", "TODAVIYA")),
+        ).getOrNull()
+        val lines = requireNotNull(specs).single().lines.joinToString(" ")
+        assertTrue(lines.contains("Привет"), "usable translation lost: $lines")
+        assertFalse(lines.contains("TODAVIYA"), "junk leaked into spec: $lines")
     }
 }
