@@ -84,8 +84,17 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    // Клик по главе (ФАЗА 15): скачанная глава открывается офлайн в читалке,
+    // иначе ставится в очередь скачивания.
     fun onChapterClick(chapter: ChapterEntity) {
         viewModelScope.launch {
+            val latest = downloadTaskDao.latestForChapter(chapter.id)
+            if (latest?.status == DownloadStatus.COMPLETED) {
+                _uiState.update {
+                    it.copy(message = DetailsMessage.OpenReader(mangaId = chapter.mangaId, chapterId = chapter.id))
+                }
+                return@launch
+            }
             downloadTaskDao.upsert(
                 DownloadTaskEntity(
                     mangaId = chapter.mangaId,

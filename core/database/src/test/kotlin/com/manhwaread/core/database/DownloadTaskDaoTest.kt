@@ -40,4 +40,32 @@ class DownloadTaskDaoTest : DaoTestBase() {
         assertEquals(1, withTimeout(DAO_TIMEOUT_MS) { dao.observeByStatus(DownloadStatus.PENDING).first() }.size)
         assertTrue(withTimeout(DAO_TIMEOUT_MS) { dao.observeByStatus(DownloadStatus.COMPLETED).first() }.isEmpty())
     }
+
+    @Test
+    fun `find by id returns stored task or null`() = runBlocking {
+        val dao = db.downloadTaskDao()
+        val id = dao.upsert(DownloadTaskEntity(mangaId = 1L, chapterId = 2L, enqueuedAtMs = 10L))
+        assertEquals(DownloadStatus.PENDING, dao.findById(id)?.status)
+        assertEquals(null, dao.findById(id + 100))
+    }
+
+    @Test
+    fun `latest for chapter returns newest by enqueue time`() = runBlocking {
+        val dao = db.downloadTaskDao()
+        dao.upsert(DownloadTaskEntity(mangaId = 1L, chapterId = 2L, enqueuedAtMs = 10L))
+        dao.upsert(
+            DownloadTaskEntity(
+                mangaId = 1L,
+                chapterId = 2L,
+                status = DownloadStatus.COMPLETED,
+                progress = 1f,
+                enqueuedAtMs = 50L,
+            ),
+        )
+        dao.upsert(DownloadTaskEntity(mangaId = 1L, chapterId = 3L, enqueuedAtMs = 90L))
+        val latest = dao.latestForChapter(2L)
+        assertEquals(DownloadStatus.COMPLETED, latest?.status)
+        assertEquals(50L, latest?.enqueuedAtMs)
+        assertEquals(null, dao.latestForChapter(999L))
+    }
 }

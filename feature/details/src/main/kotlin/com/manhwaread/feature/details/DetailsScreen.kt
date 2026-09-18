@@ -68,6 +68,7 @@ fun DetailsRoute(
     sourceId: Long?,
     mangaUrl: String?,
     onBack: () -> Unit,
+    onOpenReader: (mangaId: Long, chapterId: Long) -> Unit,
     viewModel: DetailsViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(mangaId, sourceId, mangaUrl) {
@@ -83,6 +84,7 @@ fun DetailsRoute(
             onBack = onBack,
             onToggleLibrary = viewModel::onToggleLibrary,
             onChapterClick = viewModel::onChapterClick,
+            onOpenReader = onOpenReader,
             onRetry = viewModel::onRetry,
             onMessageShown = viewModel::onMessageShown,
         ),
@@ -98,6 +100,14 @@ fun DetailsScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val message = state.message
+    // Переход в читалку — навигационное сообщение: обрабатывается отдельно, без snackbar.
+    val openReader = message as? DetailsMessage.OpenReader
+    LaunchedEffect(openReader) {
+        if (openReader != null) {
+            actions.onOpenReader(openReader.mangaId, openReader.chapterId)
+            actions.onMessageShown()
+        }
+    }
     // Текст сообщения вычисляется в композиции: stringResource недоступен в suspend-лямбде.
     val messageText = message?.let { detailsMessage -> detailsMessageText(detailsMessage) }
     LaunchedEffect(messageText) {
@@ -148,11 +158,12 @@ fun DetailsScreen(
 }
 
 @Composable
-private fun detailsMessageText(message: DetailsMessage): String = when (message) {
+private fun detailsMessageText(message: DetailsMessage): String? = when (message) {
     is DetailsMessage.AddedToDownloads ->
         stringResource(R.string.details_added_to_downloads, message.chapterName)
     DetailsMessage.AddedToLibrary -> stringResource(R.string.details_added_to_library)
     DetailsMessage.RemovedFromLibrary -> stringResource(R.string.details_removed_from_library)
+    is DetailsMessage.OpenReader -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

@@ -19,4 +19,7 @@
     <string name="downloads_stage_done">Готово</string>
     <string name="downloads_stage_failed">Сбой</string>
     <string name="downloads_stage_cancelled">Отменено</string>
+    <string name="downloads_selfcheck">Самопроверка</string>
+    <string name="downloads_selfcheck_success">Конвейер в порядке: сегментов %1$d, оверлеев %2$d</string>
+    <string name="downloads_selfcheck_failed">Самопроверка не пройдена на стадии %1$s</string>
 </resources>

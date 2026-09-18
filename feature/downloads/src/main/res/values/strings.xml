@@ -19,4 +19,7 @@
     <string name="downloads_stage_done">Done</string>
     <string name="downloads_stage_failed">Failed</string>
     <string name="downloads_stage_cancelled">Cancelled</string>
+    <string name="downloads_selfcheck">Self-check</string>
+    <string name="downloads_selfcheck_success">Pipeline OK: %1$d segments, %2$d overlays</string>
+    <string name="downloads_selfcheck_failed">Self-check failed at stage %1$s</string>
 </resources>

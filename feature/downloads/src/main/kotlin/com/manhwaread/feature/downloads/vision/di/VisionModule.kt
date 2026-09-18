@@ -5,11 +5,11 @@ import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.manhwaread.core.pipeline.ChapterAnalyzer
-import com.manhwaread.core.pipeline.InMemoryPageStore
 import com.manhwaread.core.pipeline.PageStore
 import com.manhwaread.core.vision.DetectedLang
 import com.manhwaread.feature.downloads.vision.BitmapFactoryPageBitmapDecoder
 import com.manhwaread.feature.downloads.vision.BubbleDetector
+import com.manhwaread.feature.downloads.vision.BubbleStore
 import com.manhwaread.feature.downloads.vision.Inpainter
 import com.manhwaread.feature.downloads.vision.MlKitOcrEngine
 import com.manhwaread.feature.downloads.vision.MultiLangOcrEngine
@@ -62,11 +62,8 @@ object VisionModule {
     @Singleton
     fun providePageBitmapDecoder(): PageBitmapDecoder = BitmapFactoryPageBitmapDecoder()
 
-    // До ФАЗЫ 15 (очередь/офлайн) страницы живут в памяти процесса;
-    // Room-реализация PageStore заменяет эту при сборке очереди загрузки.
-    @Provides
-    @Singleton
-    fun providePageStore(): PageStore = InMemoryPageStore()
+    // PageStore предоставляет QueueModule (ФАЗА 15): файловое хранилище
+    // pages каталога главы вместо памяти процесса.
 
     @Provides
     @Singleton
@@ -75,5 +72,6 @@ object VisionModule {
         bitmapDecoder: PageBitmapDecoder,
         detector: BubbleDetector,
         ocr: OcrEngine,
-    ): ChapterAnalyzer = VisionChapterAnalyzer(pageStore, bitmapDecoder, detector, ocr)
+        bubbleStore: BubbleStore,
+    ): ChapterAnalyzer = VisionChapterAnalyzer(pageStore, bitmapDecoder, detector, ocr, bubbleStore = bubbleStore)
 }

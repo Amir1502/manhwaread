@@ -53,6 +53,16 @@ dependencies {
     // transitively даёт :core:model (DownloadStatus).
     implementation(project(":core:database"))
 
+    // Реестр источников и контракты Source/SChapter/Page для загрузчика очереди (ФАЗА 15).
+    implementation(project(":source:api"))
+    // asAppError + OkHttpClient (api-транзитивно) для скачивания страниц глав.
+    implementation(project(":core:network"))
+    // Настройки перевода и ключи: очередь запускает перевод только при выбранном провайдере.
+    implementation(project(":core:datastore"))
+    // Кодеки каталога главы (chapter.json/overlays.json): владелец формата — :feature:reader,
+    // переиспользуем их, чтобы писатель архива и читалка не разошлись (ФАЗА 15).
+    implementation(project(":feature:reader"))
+
     // Vision-движки стадии анализа (ФАЗА 11).
     implementation(libs.opencv)
     implementation(libs.onnxruntime.android)
@@ -71,6 +81,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
+    testImplementation(libs.mockwebserver)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.junit)

@@ -13,6 +13,7 @@ import com.manhwaread.core.database.TranslationJobEntity
 import com.manhwaread.core.model.DownloadStatus
 import com.manhwaread.core.pipeline.JobState
 import com.manhwaread.core.pipeline.StageStatus
+import com.manhwaread.feature.downloads.selfcheck.SelfCheckExecutor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,10 +24,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel экрана «Загрузки» (ФАЗА 14): две очереди — скачивание глав
+ * ViewModel экрана «Загрузки» (ФАЗЫ 14–15): две очереди — скачивание глав
  * (DownloadTaskDao) и задачи перевода (TranslationJobDao). Названия
  * тайтлов/глав подтягиваются из БД с кэшем id→строка. Отмена доступна
- * только для незавершённых элементов; исполнение очередей — ФАЗА 15.
+ * только для незавершённых элементов; кнопка самопроверки прогоняет
+ * конвейер офлайн (DoD «Self-check прогоняет пайплайн офлайн»).
  */
 @HiltViewModel
 class DownloadsViewModel @Inject constructor(
@@ -34,6 +36,7 @@ class DownloadsViewModel @Inject constructor(
     private val translationJobDao: TranslationJobDao,
     private val mangaDao: MangaDao,
     private val chapterDao: ChapterDao,
+    private val selfCheckExecutor: SelfCheckExecutor,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DownloadsUiState())
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
@@ -81,6 +84,21 @@ class DownloadsViewModel @Inject constructor(
                 JobState(status = StageStatus.CANCELLED, attempts = job.attempts, lastError = null),
             )
         }
+    }
+
+    // Запуск офлайн-самопроверки конвейера; повторный запуск во время прогона игнорируется.
+    fun onRunSelfCheck() {
+        if (_uiState.value.isSelfCheckRunning) return
+        _uiState.update { state -> state.copy(isSelfCheckRunning = true, selfCheck = null) }
+        viewModelScope.launch {
+            val result = selfCheckExecutor.run()
+            _uiState.update { state -> state.copy(isSelfCheckRunning = false, selfCheck = result) }
+        }
+    }
+
+    // Результат показан (snackbar) — очищаем ячейку сообщения.
+    fun onSelfCheckShown() {
+        _uiState.update { state -> state.copy(selfCheck = null) }
     }
 
     private suspend fun toTaskRow(task: DownloadTaskEntity): DownloadTaskRow = DownloadTaskRow(

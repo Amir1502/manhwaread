@@ -61,6 +61,8 @@ dependencies {
     implementation(project(":feature:downloads"))
     implementation(project(":feature:details"))
     implementation(project(":feature:onboarding"))
+    // Читалка: офлайн-маршрут главы из каталога очереди (ФАЗА 15).
+    implementation(project(":feature:reader"))
     // Источники и сетевой слой регистрируются в SourceModule (ФАЗА 13).
     implementation(project(":core:network"))
     implementation(project(":source:api"))

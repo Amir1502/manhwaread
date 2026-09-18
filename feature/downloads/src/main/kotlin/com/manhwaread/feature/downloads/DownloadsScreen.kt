@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,10 +21,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -35,6 +41,7 @@ import com.manhwaread.core.pipeline.StageStatus
 
 private val ContentPadding = 12.dp
 private val ItemSpacing = 8.dp
+private val SelfCheckIndicatorSize = 18.dp
 
 // Точка входа раздела «Загрузки» (подключается в NavHost приложения).
 @Composable
@@ -45,6 +52,8 @@ fun DownloadsRoute(viewModel: DownloadsViewModel = hiltViewModel()) {
         actions = DownloadsActions(
             onCancelTask = viewModel::onCancelTask,
             onCancelJob = viewModel::onCancelJob,
+            onRunSelfCheck = viewModel::onRunSelfCheck,
+            onSelfCheckShown = viewModel::onSelfCheckShown,
         ),
     )
 }
@@ -56,10 +65,28 @@ fun DownloadsScreen(
     actions: DownloadsActions,
     modifier: Modifier = Modifier,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val selfCheck = state.selfCheck
+    val successText = stringResource(R.string.downloads_selfcheck_success, selfCheck?.segments ?: 0, selfCheck?.overlays ?: 0)
+    val failedText = stringResource(R.string.downloads_selfcheck_failed, selfCheck?.status?.name.orEmpty())
+    LaunchedEffect(state.selfCheck) {
+        val result = state.selfCheck ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(if (result.success) successText else failedText)
+        actions.onSelfCheckShown()
+    }
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.downloads_title)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.downloads_title)) },
+                actions = {
+                    SelfCheckAction(
+                        isRunning = state.isSelfCheckRunning,
+                        onRun = actions.onRunSelfCheck,
+                    )
+                },
+            )
         },
     ) { innerPadding ->
         when {
@@ -115,6 +142,29 @@ private fun SectionHeader(textRes: Int) {
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = ItemSpacing),
     )
+}
+
+// Кнопка офлайн-самопроверки конвейера: во время прогона — индикатор вместо иконки.
+@Composable
+private fun SelfCheckAction(isRunning: Boolean, onRun: () -> Unit) {
+    if (isRunning) {
+        Box(
+            modifier = Modifier.padding(horizontal = ContentPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(SelfCheckIndicatorSize),
+                strokeWidth = 2.dp,
+            )
+        }
+    } else {
+        IconButton(onClick = onRun) {
+            Icon(
+                imageVector = Icons.Filled.Science,
+                contentDescription = stringResource(R.string.downloads_selfcheck),
+            )
+        }
+    }
 }
 
 @Composable

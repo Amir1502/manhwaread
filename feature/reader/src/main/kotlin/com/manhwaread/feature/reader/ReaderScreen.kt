@@ -54,17 +54,25 @@ private val SheetBlockSpacing = 8.dp
 
 // Экран читалки: четыре режима (вебтун-лента, вертикальный и горизонтальные
 // пейджеры), зум до 5x, векторный слой перевода, карточка бабла по тапу.
+// initialPageIndex/onProgress — интеграция с историей чтения (ФАЗА 15).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
     chapterDir: File?,
     onBack: () -> Unit,
+    initialPageIndex: Int = 0,
+    onProgress: (pageIndex: Int) -> Unit = {},
     viewModel: ReaderViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(chapterDir) {
+    LaunchedEffect(chapterDir, initialPageIndex) {
         if (chapterDir != null) {
-            viewModel.openChapter(chapterDir)
+            viewModel.openChapter(chapterDir, initialPageIndex)
+        }
+    }
+    LaunchedEffect(state.chapter, state.currentPageIndex) {
+        if (state.chapter != null) {
+            onProgress(state.currentPageIndex)
         }
     }
     Scaffold(

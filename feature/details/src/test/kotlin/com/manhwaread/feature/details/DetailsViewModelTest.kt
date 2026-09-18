@@ -191,6 +191,11 @@ class DetailsViewModelTest {
             emit(tasks.filter { it.status == status })
         }
 
+        override suspend fun findById(id: Long): DownloadTaskEntity? = tasks.firstOrNull { it.id == id }
+
+        override suspend fun latestForChapter(chapterId: Long): DownloadTaskEntity? =
+            tasks.filter { it.chapterId == chapterId }.maxByOrNull { it.enqueuedAtMs }
+
         override fun observeAll(): Flow<List<DownloadTaskEntity>> = flow { emit(tasks.toList()) }
 
         override suspend fun deleteByStatus(status: DownloadStatus) {
@@ -368,6 +373,63 @@ class DetailsViewModelTest {
         assertEquals(DownloadStatus.PENDING, task.status)
         assertEquals(0f, task.progress)
         assertTrue(task.enqueuedAtMs > 0L)
+        assertEquals(DetailsMessage.AddedToDownloads("Chapter 5"), viewModel.uiState.value.message)
+    }
+
+    @Test
+    fun `chapter click opens reader when download completed`() = runTest {
+        val source = FakeSource(
+            id = 1L,
+            details = detailsManga,
+            chapters = listOf(SChapter(url = "/manga/solo/chapter-5", name = "Chapter 5")),
+        )
+        val viewModel = viewModelWith(source)
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+        val chapter = viewModel.uiState.value.chapters.first()
+        downloadTaskDao.upsert(
+            DownloadTaskEntity(
+                mangaId = chapter.mangaId,
+                chapterId = chapter.id,
+                status = DownloadStatus.COMPLETED,
+                progress = 1f,
+                enqueuedAtMs = 5L,
+            ),
+        )
+        viewModel.onChapterClick(chapter)
+        advanceUntilIdle()
+        // Новая задача НЕ создаётся — глава уже скачана, открывается читалка.
+        assertEquals(1, downloadTaskDao.tasks.size)
+        assertEquals(
+            DetailsMessage.OpenReader(mangaId = chapter.mangaId, chapterId = chapter.id),
+            viewModel.uiState.value.message,
+        )
+    }
+
+    @Test
+    fun `chapter click re-enqueues when latest download failed`() = runTest {
+        val source = FakeSource(
+            id = 1L,
+            details = detailsManga,
+            chapters = listOf(SChapter(url = "/manga/solo/chapter-5", name = "Chapter 5")),
+        )
+        val viewModel = viewModelWith(source)
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+        val chapter = viewModel.uiState.value.chapters.first()
+        downloadTaskDao.upsert(
+            DownloadTaskEntity(
+                mangaId = chapter.mangaId,
+                chapterId = chapter.id,
+                status = DownloadStatus.FAILED,
+                progress = 0.2f,
+                enqueuedAtMs = 5L,
+            ),
+        )
+        viewModel.onChapterClick(chapter)
+        advanceUntilIdle()
+        assertEquals(2, downloadTaskDao.tasks.size)
+        assertEquals(DownloadStatus.PENDING, downloadTaskDao.tasks[1].status)
         assertEquals(DetailsMessage.AddedToDownloads("Chapter 5"), viewModel.uiState.value.message)
     }
 

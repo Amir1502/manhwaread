@@ -29,18 +29,26 @@ class ReaderViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
-    fun openChapter(chapterDir: File) {
+    // initialPageIndex — позиция из истории чтения (ФАЗА 15): лента/пейджер
+    // стартуют с сохранённой страницы через существующий механизм scrollTarget.
+    fun openChapter(chapterDir: File, initialPageIndex: Int = 0) {
         _uiState.update { state -> state.copy(isLoading = true, loadError = null) }
         viewModelScope.launch {
             runCatching { contentLoader.loadChapter(chapterDir) }.fold(
                 onSuccess = { chapter ->
+                    val startPage = if (chapter.pages.isEmpty()) {
+                        0
+                    } else {
+                        initialPageIndex.coerceIn(0, chapter.pages.lastIndex)
+                    }
                     _uiState.update { state ->
                         state.copy(
                             chapter = chapter,
                             isLoading = false,
                             loadError = null,
                             transforms = emptyMap(),
-                            currentPageIndex = 0,
+                            currentPageIndex = startPage,
+                            scrollTarget = startPage.takeIf { page -> page > 0 },
                         )
                     }
                 },

@@ -10,7 +10,10 @@ import com.manhwaread.core.database.TranslationJobDao
 import com.manhwaread.core.database.TranslationJobEntity
 import com.manhwaread.core.model.DownloadStatus
 import com.manhwaread.core.pipeline.StageStatus
+import com.manhwaread.feature.downloads.selfcheck.SelfCheckExecutor
+import com.manhwaread.feature.downloads.selfcheck.SelfCheckResult
 import com.manhwaread.source.api.MangaStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +26,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -66,6 +70,11 @@ class DownloadsViewModelTest {
 
         override fun observeByStatus(status: DownloadStatus): Flow<List<DownloadTaskEntity>> =
             MutableStateFlow(emptyList())
+
+        override suspend fun findById(id: Long): DownloadTaskEntity? = rows[id]
+
+        override suspend fun latestForChapter(chapterId: Long): DownloadTaskEntity? =
+            rows.values.filter { it.chapterId == chapterId }.maxByOrNull { it.enqueuedAtMs }
 
         override fun observeAll(): Flow<List<DownloadTaskEntity>> = allFlow
 
@@ -177,10 +186,26 @@ class DownloadsViewModelTest {
         override suspend fun deleteForManga(mangaId: Long) = Unit
     }
 
+    private class FakeSelfCheckExecutor : SelfCheckExecutor {
+        var result = SelfCheckResult(success = true, status = StageStatus.DONE, segments = 2, overlays = 1)
+        var runs = 0
+            private set
+
+        // Затвор для проверки блокировки повторного запуска во время прогона.
+        var gate: CompletableDeferred<Unit>? = null
+
+        override suspend fun run(): SelfCheckResult {
+            runs++
+            gate?.await()
+            return result
+        }
+    }
+
     private val taskDao = FakeDownloadTaskDao()
     private val jobDao = FakeTranslationJobDao()
     private val mangaDao = FakeMangaDao()
     private val chapterDao = FakeChapterDao()
+    private val selfCheckExecutor = FakeSelfCheckExecutor()
 
     private fun seedTitles() {
         mangaDao.rows[1L] = MangaEntity(
@@ -226,7 +251,7 @@ class DownloadsViewModelTest {
     )
 
     private fun viewModel(): DownloadsViewModel =
-        DownloadsViewModel(taskDao, jobDao, mangaDao, chapterDao)
+        DownloadsViewModel(taskDao, jobDao, mangaDao, chapterDao, selfCheckExecutor)
 
     @Test
     fun `init maps tasks and jobs with titles`() = runTest {
@@ -337,5 +362,46 @@ class DownloadsViewModelTest {
         jobDao.seed(job())
         advanceUntilIdle()
         assertEquals(1, viewModel.uiState.value.jobs.size)
+    }
+
+    @Test
+    fun `self check run publishes result`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.onRunSelfCheck()
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
+        assertFalse(state.isSelfCheckRunning)
+        assertEquals(2, state.selfCheck?.segments)
+        assertEquals(1, state.selfCheck?.overlays)
+        assertTrue(state.selfCheck?.success == true)
+        assertEquals(1, selfCheckExecutor.runs)
+    }
+
+    @Test
+    fun `self check running blocks second run`() = runTest {
+        selfCheckExecutor.gate = CompletableDeferred()
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.onRunSelfCheck()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isSelfCheckRunning)
+        viewModel.onRunSelfCheck()
+        advanceUntilIdle()
+        assertEquals(1, selfCheckExecutor.runs)
+        selfCheckExecutor.gate?.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isSelfCheckRunning)
+    }
+
+    @Test
+    fun `self check shown clears result`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.onRunSelfCheck()
+        advanceUntilIdle()
+        viewModel.onSelfCheckShown()
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.selfCheck)
     }
 }
