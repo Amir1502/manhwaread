@@ -50,8 +50,17 @@ kotlin {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:database"))
+    // Флаг онбординга для корневого гейта (ФАЗА 14).
+    implementation(project(":core:datastore"))
     // Настройки провайдера перевода подключены к NavHost (ФАЗА 12).
     implementation(project(":feature:settings"))
+    // Разделы UI подключены к NavHost (ФАЗА 14).
+    implementation(project(":feature:library"))
+    implementation(project(":feature:browse"))
+    implementation(project(":feature:history"))
+    implementation(project(":feature:downloads"))
+    implementation(project(":feature:details"))
+    implementation(project(":feature:onboarding"))
     // Источники и сетевой слой регистрируются в SourceModule (ФАЗА 13).
     implementation(project(":core:network"))
     implementation(project(":source:api"))

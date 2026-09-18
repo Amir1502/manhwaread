@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_title">Библиотека</string>
+    <string name="library_search_hint">Фильтр по названию…</string>
+    <string name="library_remove">Убрать из библиотеки</string>
+    <string name="library_empty">Библиотека пуста — добавьте тайтлы из каталога</string>
+    <string name="library_search_empty">Ничего не найдено по фильтру</string>
+</resources>

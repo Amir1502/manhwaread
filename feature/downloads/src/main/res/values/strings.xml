@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_title">Downloads</string>
+    <string name="downloads_tasks_header">Chapter downloads</string>
+    <string name="downloads_jobs_header">Translation queue</string>
+    <string name="downloads_empty">The queue is empty</string>
+    <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_attempts">Attempts: %1$d</string>
+    <string name="downloads_status_pending">Waiting</string>
+    <string name="downloads_status_running">Downloading</string>
+    <string name="downloads_status_completed">Completed</string>
+    <string name="downloads_status_failed">Error</string>
+    <string name="downloads_status_cancelled">Cancelled</string>
+    <string name="downloads_stage_queued">In queue</string>
+    <string name="downloads_stage_downloading">Downloading</string>
+    <string name="downloads_stage_analyzing">Analyzing</string>
+    <string name="downloads_stage_translating">Translating</string>
+    <string name="downloads_stage_compositing">Compositing</string>
+    <string name="downloads_stage_done">Done</string>
+    <string name="downloads_stage_failed">Failed</string>
+    <string name="downloads_stage_cancelled">Cancelled</string>
+</resources>

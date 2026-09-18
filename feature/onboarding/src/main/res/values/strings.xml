@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_start">Start reading</string>
+    <string name="onboarding_welcome_title">Welcome to Manhwaread</string>
+    <string name="onboarding_welcome_body">Read Korean and Japanese manhwa and manga with automatic translation into Russian.</string>
+    <string name="onboarding_overlay_title">Translation is a vector layer</string>
+    <string name="onboarding_overlay_body">The translation is not baked into the picture: it is drawn over the bubbles, stays sharp at any zoom, and can be hidden or edited at any moment.</string>
+    <string name="onboarding_providers_title">Your AI — your keys</string>
+    <string name="onboarding_providers_body">Connect a translation provider in Settings: OpenAI-compatible API, Gemini, DeepL and others. Keys stay on the device in encrypted storage.</string>
+</resources>

@@ -7,6 +7,7 @@ import androidx.room.Query
 import com.manhwaread.core.pipeline.ChapterJob
 import com.manhwaread.core.pipeline.ChapterJobStore
 import com.manhwaread.core.pipeline.JobState
+import kotlinx.coroutines.flow.Flow
 
 /** Персистентная очередь задач конвейера; реализует [ChapterJobStore] из :core:pipeline. */
 @Dao
@@ -23,6 +24,10 @@ interface TranslationJobDao : ChapterJobStore {
 
     @Query("SELECT * FROM translation_jobs ORDER BY priority DESC, createdAt ASC")
     suspend fun allEntities(): List<TranslationJobEntity>
+
+    // Реактивная очередь конвейера для экрана «Загрузки» (ФАЗА 14).
+    @Query("SELECT * FROM translation_jobs ORDER BY priority DESC, createdAt ASC")
+    fun observeAllEntities(): Flow<List<TranslationJobEntity>>
 
     override suspend fun enqueue(job: ChapterJob) {
         upsertEntity(job.toEntity())

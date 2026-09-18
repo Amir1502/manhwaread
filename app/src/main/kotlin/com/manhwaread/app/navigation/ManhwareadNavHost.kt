@@ -1,35 +1,60 @@
 package com.manhwaread.app.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import android.net.Uri
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.manhwaread.feature.browse.BrowseRoute
+import com.manhwaread.feature.details.DetailsRoute
+import com.manhwaread.feature.downloads.DownloadsRoute
+import com.manhwaread.feature.history.HistoryRoute
+import com.manhwaread.feature.library.LibraryRoute
+import com.manhwaread.feature.onboarding.OnboardingRoute
 import com.manhwaread.feature.settings.SettingsRoute
 
-private val PlaceholderIconSize = 48.dp
+// Маршруты карточки тайтла: по id в БД (библиотека/история) и по координатам
+// источника (каталог). mangaUrl передаётся query-параметром после Uri.encode —
+// слеши и спецсимволы пути не ломают сопоставление маршрута, а NavController
+// возвращает значение уже декодированным.
+private const val DETAILS_BY_ID_ROUTE = "details/id/{mangaId}"
+private const val DETAILS_BY_SOURCE_ROUTE = "details/source/{sourceId}?mangaUrl={mangaUrl}"
+private const val ARG_MANGA_ID = "mangaId"
+private const val ARG_SOURCE_ID = "sourceId"
+private const val ARG_MANGA_URL = "mangaUrl"
 
-// Корень приложения: Scaffold с нижней навигацией по разделам.
+// Корень приложения: гейт онбординга + Scaffold с нижней навигацией.
 @Composable
-fun ManhwareadRoot() {
+fun ManhwareadRoot(viewModel: RootViewModel = hiltViewModel()) {
+    val onboardingCompleted by viewModel.onboardingCompleted.collectAsStateWithLifecycle()
+    when (onboardingCompleted) {
+        // Флаг ещё читается из DataStore: не показываем ни онбординг, ни разделы.
+        null -> Box(modifier = Modifier.fillMaxSize())
+        false -> OnboardingRoute()
+        true -> MainScaffold()
+    }
+}
+
+@Composable
+private fun MainScaffold() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -75,15 +100,52 @@ fun ManhwareadNavHost(
         startDestination = startRoute.route,
         modifier = modifier,
     ) {
-        AppRoute.entries.forEach { destination ->
-            composable(route = destination.route) {
-                if (destination == AppRoute.SETTINGS) {
-                    // ФАЗА 12: экран настроек провайдера перевода — рабочий раздел.
-                    SettingsRoute()
-                } else {
-                    SectionPlaceholderScreen(destination)
-                }
-            }
+        composable(route = AppRoute.LIBRARY.route) {
+            LibraryRoute(onOpenManga = { mangaId -> navController.navigateToDetailsById(mangaId) })
+        }
+        composable(route = AppRoute.BROWSE.route) {
+            BrowseRoute(
+                onOpenManga = { sourceId, mangaUrl ->
+                    navController.navigateToDetailsBySource(sourceId, mangaUrl)
+                },
+            )
+        }
+        composable(route = AppRoute.HISTORY.route) {
+            HistoryRoute(onOpenManga = { mangaId -> navController.navigateToDetailsById(mangaId) })
+        }
+        composable(route = AppRoute.DOWNLOADS.route) {
+            DownloadsRoute()
+        }
+        composable(route = AppRoute.SETTINGS.route) {
+            SettingsRoute()
+        }
+        composable(
+            route = DETAILS_BY_ID_ROUTE,
+            arguments = listOf(navArgument(ARG_MANGA_ID) { type = NavType.LongType }),
+        ) { entry ->
+            val mangaId = entry.arguments?.getLong(ARG_MANGA_ID) ?: 0L
+            DetailsRoute(
+                mangaId = mangaId,
+                sourceId = null,
+                mangaUrl = null,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = DETAILS_BY_SOURCE_ROUTE,
+            arguments = listOf(
+                navArgument(ARG_SOURCE_ID) { type = NavType.LongType },
+                navArgument(ARG_MANGA_URL) { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val sourceId = entry.arguments?.getLong(ARG_SOURCE_ID) ?: 0L
+            val mangaUrl = entry.arguments?.getString(ARG_MANGA_URL).orEmpty()
+            DetailsRoute(
+                mangaId = null,
+                sourceId = sourceId,
+                mangaUrl = mangaUrl,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
@@ -100,22 +162,12 @@ private fun NavHostController.navigateToTab(destination: AppRoute) {
     }
 }
 
-// Экран раздела до ФАЗЫ 14: иконка и название (рабочий контент, не заглушка).
-@Composable
-private fun SectionPlaceholderScreen(destination: AppRoute) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = destination.icon,
-            contentDescription = null,
-            modifier = Modifier.size(PlaceholderIconSize),
-        )
-        Text(
-            text = stringResource(destination.labelRes),
-            style = MaterialTheme.typography.titleLarge,
-        )
-    }
+// Карточка из библиотеки/истории: координаты источника возьмутся из строки БД.
+private fun NavHostController.navigateToDetailsById(mangaId: Long) {
+    navigate("details/id/$mangaId")
+}
+
+// Карточка из каталога: строки в БД ещё нет, передаём sourceId + url.
+private fun NavHostController.navigateToDetailsBySource(sourceId: Long, mangaUrl: String) {
+    navigate("details/source/$sourceId?mangaUrl=${Uri.encode(mangaUrl)}")
 }

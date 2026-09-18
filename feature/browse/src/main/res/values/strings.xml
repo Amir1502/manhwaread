@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="browse_title">Browse</string>
+    <string name="browse_back">Back</string>
+    <string name="browse_search_hint">Search titles…</string>
+    <string name="browse_search_action">Search</string>
+    <string name="browse_mode_popular">Popular</string>
+    <string name="browse_mode_latest">Latest</string>
+    <string name="browse_load_more">Load more</string>
+    <string name="browse_retry">Retry</string>
+    <string name="browse_empty">Nothing found</string>
+    <string name="browse_sources_empty">No sources connected</string>
+    <string name="browse_nsfw_badge" translatable="false">18+</string>
+</resources>

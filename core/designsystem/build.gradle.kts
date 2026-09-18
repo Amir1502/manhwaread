@@ -39,6 +39,9 @@ dependencies {
     api(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 
+    // AppError входит в сигнатуру общего маппера ошибок (ФАЗА 14) — api.
+    api(project(":core:common"))
+
     // Тесты палитры — чистый JVM (математика цветов не требует Android).
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

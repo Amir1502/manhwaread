@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="details_title">Карточка</string>
+    <string name="details_back">Назад</string>
+    <string name="details_author">Автор: %1$s</string>
+    <string name="details_artist">Художник: %1$s</string>
+    <string name="details_status">Статус: %1$s</string>
+    <string name="details_status_unknown">Неизвестен</string>
+    <string name="details_status_ongoing">Выпускается</string>
+    <string name="details_status_completed">Завершён</string>
+    <string name="details_status_hiatus">Приостановлен</string>
+    <string name="details_status_cancelled">Отменён</string>
+    <string name="details_add_to_library">В библиотеку</string>
+    <string name="details_remove_from_library">В библиотеке — убрать</string>
+    <string name="details_chapters">Главы</string>
+    <string name="details_no_chapters">Нет глав</string>
+    <string name="details_retry">Повторить</string>
+    <string name="details_added_to_downloads">«%1$s» добавлена в загрузки</string>
+    <string name="details_added_to_library">Добавлено в библиотеку</string>
+    <string name="details_removed_from_library">Убрано из библиотеки</string>
+</resources>

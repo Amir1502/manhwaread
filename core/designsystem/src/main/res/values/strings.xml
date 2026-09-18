@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Единые тексты ошибок приложения (AppError), ФАЗА 14. -->
+    <string name="ds_error_network">Network error. Check the connection and retry.</string>
+    <string name="ds_error_source_unavailable">Source is unavailable.</string>
+    <string name="ds_error_source_layout_changed">The source layout has changed — the app needs an update.</string>
+    <string name="ds_error_cloudflare_blocked">Blocked by Cloudflare protection.</string>
+    <string name="ds_error_rate_limited">Too many requests. Try again later.</string>
+    <string name="ds_error_provider_auth">Provider authentication failed. Check the API key.</string>
+    <string name="ds_error_provider_quota">Provider quota exhausted.</string>
+    <string name="ds_error_provider_bad_response">Bad response: %1$s</string>
+    <string name="ds_error_ocr_failed">Text recognition failed.</string>
+    <string name="ds_error_vision_failed">Page analysis failed.</string>
+    <string name="ds_error_typeset_overflow">Text does not fit into bubble %1$s.</string>
+    <string name="ds_error_storage_full">Storage is full.</string>
+    <string name="ds_error_unknown">Unknown error.</string>
+</resources>

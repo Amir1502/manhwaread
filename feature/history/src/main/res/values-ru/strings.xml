@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_title">История</string>
+    <string name="history_clear">Очистить историю</string>
+    <string name="history_clear_confirm_title">Очистить историю?</string>
+    <string name="history_clear_confirm_message">Все позиции чтения будут удалены.</string>
+    <string name="history_clear_confirm">Очистить</string>
+    <string name="history_cancel">Отмена</string>
+    <string name="history_cleared">История очищена</string>
+    <string name="history_empty">Пока ничего не прочитано</string>
+</resources>

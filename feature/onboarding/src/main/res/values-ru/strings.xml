@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_back">Назад</string>
+    <string name="onboarding_skip">Пропустить</string>
+    <string name="onboarding_next">Далее</string>
+    <string name="onboarding_start">Начать читать</string>
+    <string name="onboarding_welcome_title">Добро пожаловать в Manhwaread</string>
+    <string name="onboarding_welcome_body">Читайте корейскую и японскую манхву и мангу с автоматическим переводом на русский.</string>
+    <string name="onboarding_overlay_title">Перевод — векторный слой</string>
+    <string name="onboarding_overlay_body">Перевод не запекается в картинку: он рисуется поверх облачков, остаётся резким на любом зуме, отключается и правится в любой момент.</string>
+    <string name="onboarding_providers_title">Ваш ИИ — ваши ключи</string>
+    <string name="onboarding_providers_body">Подключите провайдера перевода в настройках: OpenAI-совместимый API, Gemini, DeepL и другие. Ключи хранятся только на устройстве в зашифрованном хранилище.</string>
+</resources>

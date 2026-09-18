@@ -41,12 +41,17 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 
     // ChapterAnalyzer/PageStore/ChapterJob — контракты конвейера; transitively
     // тянет :core:common (DomainResult/AppError) и :core:vision-model (Bubble/TextSegment).
     api(project(":core:pipeline"))
+
+    // DAO очереди загрузок и задач перевода для экрана «Загрузки» (ФАЗА 14);
+    // transitively даёт :core:model (DownloadStatus).
+    implementation(project(":core:database"))
 
     // Vision-движки стадии анализа (ФАЗА 11).
     implementation(libs.opencv)
@@ -55,6 +60,9 @@ dependencies {
     implementation(libs.mlkit.text.recognition.korean)
     implementation(libs.mlkit.text.recognition.japanese)
 
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.kotlinx.coroutines.android)

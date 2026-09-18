@@ -47,12 +47,21 @@ class SettingsViewModelTest {
 
     private class FakeSettingsStore(initial: TranslationSettings = TranslationSettings()) : SettingsStore {
         private val current = MutableStateFlow(initial)
+        private val onboarding = MutableStateFlow(false)
         var saved: TranslationSettings? = null
+        var onboardingSaved: Boolean? = null
         override val translationSettings: Flow<TranslationSettings> = current.asStateFlow()
 
         override suspend fun updateTranslation(settings: TranslationSettings) {
             saved = settings
             current.value = settings
+        }
+
+        override val onboardingCompleted: Flow<Boolean> = onboarding.asStateFlow()
+
+        override suspend fun setOnboardingCompleted(completed: Boolean) {
+            onboardingSaved = completed
+            onboarding.value = completed
         }
     }
 

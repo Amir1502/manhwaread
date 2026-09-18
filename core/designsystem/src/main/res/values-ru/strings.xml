@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Единые тексты ошибок приложения (AppError), ФАЗА 14. -->
+    <string name="ds_error_network">Ошибка сети. Проверьте соединение и повторите.</string>
+    <string name="ds_error_source_unavailable">Источник недоступен.</string>
+    <string name="ds_error_source_layout_changed">Разметка источника изменилась — приложению требуется обновление.</string>
+    <string name="ds_error_cloudflare_blocked">Заблокировано защитой Cloudflare.</string>
+    <string name="ds_error_rate_limited">Слишком много запросов. Попробуйте позже.</string>
+    <string name="ds_error_provider_auth">Ошибка авторизации у провайдера. Проверьте API-ключ.</string>
+    <string name="ds_error_provider_quota">Квота провайдера исчерпана.</string>
+    <string name="ds_error_provider_bad_response">Некорректный ответ: %1$s</string>
+    <string name="ds_error_ocr_failed">Не удалось распознать текст.</string>
+    <string name="ds_error_vision_failed">Не удалось проанализировать страницу.</string>
+    <string name="ds_error_typeset_overflow">Текст не помещается в бабл %1$s.</string>
+    <string name="ds_error_storage_full">Хранилище заполнено.</string>
+    <string name="ds_error_unknown">Неизвестная ошибка.</string>
+</resources>

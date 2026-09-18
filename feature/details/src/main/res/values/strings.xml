@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="details_title">Details</string>
+    <string name="details_back">Back</string>
+    <string name="details_author">Author: %1$s</string>
+    <string name="details_artist">Artist: %1$s</string>
+    <string name="details_status">Status: %1$s</string>
+    <string name="details_status_unknown">Unknown</string>
+    <string name="details_status_ongoing">Ongoing</string>
+    <string name="details_status_completed">Completed</string>
+    <string name="details_status_hiatus">Hiatus</string>
+    <string name="details_status_cancelled">Cancelled</string>
+    <string name="details_add_to_library">Add to library</string>
+    <string name="details_remove_from_library">In library — remove</string>
+    <string name="details_chapters">Chapters</string>
+    <string name="details_no_chapters">No chapters</string>
+    <string name="details_retry">Retry</string>
+    <string name="details_added_to_downloads">“%1$s” added to downloads</string>
+    <string name="details_added_to_library">Added to library</string>
+    <string name="details_removed_from_library">Removed from library</string>
+</resources>

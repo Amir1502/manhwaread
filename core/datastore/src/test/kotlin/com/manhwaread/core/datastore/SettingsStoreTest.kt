@@ -55,4 +55,23 @@ class SettingsStoreTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `onboarding flag defaults to false and roundtrips`() = runBlocking {
+        val store = newStore()
+        assertEquals(false, store.onboardingCompleted.first())
+        store.setOnboardingCompleted(true)
+        assertEquals(true, store.onboardingCompleted.first())
+    }
+
+    @Test
+    fun `onboarding flag emits updates to collector`() = runBlocking {
+        val store = newStore()
+        store.onboardingCompleted.test {
+            assertEquals(false, awaitItem())
+            store.setOnboardingCompleted(true)
+            assertEquals(true, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

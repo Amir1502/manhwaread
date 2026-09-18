@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_title">Загрузки</string>
+    <string name="downloads_tasks_header">Скачивание глав</string>
+    <string name="downloads_jobs_header">Очередь перевода</string>
+    <string name="downloads_empty">Очередь пуста</string>
+    <string name="downloads_cancel">Отменить</string>
+    <string name="downloads_attempts">Попытки: %1$d</string>
+    <string name="downloads_status_pending">Ожидает</string>
+    <string name="downloads_status_running">Скачивается</string>
+    <string name="downloads_status_completed">Завершено</string>
+    <string name="downloads_status_failed">Ошибка</string>
+    <string name="downloads_status_cancelled">Отменено</string>
+    <string name="downloads_stage_queued">В очереди</string>
+    <string name="downloads_stage_downloading">Скачивание</string>
+    <string name="downloads_stage_analyzing">Анализ</string>
+    <string name="downloads_stage_translating">Перевод</string>
+    <string name="downloads_stage_compositing">Композиция</string>
+    <string name="downloads_stage_done">Готово</string>
+    <string name="downloads_stage_failed">Сбой</string>
+    <string name="downloads_stage_cancelled">Отменено</string>
+</resources>

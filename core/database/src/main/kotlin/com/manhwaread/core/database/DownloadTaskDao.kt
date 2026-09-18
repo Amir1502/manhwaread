@@ -18,6 +18,10 @@ interface DownloadTaskDao {
     @Query("SELECT * FROM download_tasks WHERE status = :status ORDER BY enqueuedAtMs ASC")
     fun observeByStatus(status: DownloadStatus): Flow<List<DownloadTaskEntity>>
 
+    // Вся очередь загрузок для экрана «Загрузки» (ФАЗА 14).
+    @Query("SELECT * FROM download_tasks ORDER BY enqueuedAtMs ASC")
+    fun observeAll(): Flow<List<DownloadTaskEntity>>
+
     @Query("DELETE FROM download_tasks WHERE status = :status")
     suspend fun deleteByStatus(status: DownloadStatus)
 }

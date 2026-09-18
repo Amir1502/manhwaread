@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="browse_title">Каталог</string>
+    <string name="browse_back">Назад</string>
+    <string name="browse_search_hint">Поиск тайтлов…</string>
+    <string name="browse_search_action">Найти</string>
+    <string name="browse_mode_popular">Популярное</string>
+    <string name="browse_mode_latest">Новинки</string>
+    <string name="browse_load_more">Загрузить ещё</string>
+    <string name="browse_retry">Повторить</string>
+    <string name="browse_empty">Ничего не найдено</string>
+    <string name="browse_sources_empty">Источники не подключены</string>
+</resources>

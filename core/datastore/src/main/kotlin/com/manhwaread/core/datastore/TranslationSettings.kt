@@ -2,6 +2,7 @@ package com.manhwaread.core.datastore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.manhwaread.core.translation.TARGET_LANG_RU
@@ -24,6 +25,10 @@ data class TranslationSettings(
 interface SettingsStore {
     val translationSettings: Flow<TranslationSettings>
     suspend fun updateTranslation(settings: TranslationSettings)
+
+    // Онбординг показывается один раз (ФАЗА 14): флаг переживает перезапуск.
+    val onboardingCompleted: Flow<Boolean>
+    suspend fun setOnboardingCompleted(completed: Boolean)
 }
 
 // Реализация на Preferences DataStore: переживает перезапуск, не в логах.
@@ -47,10 +52,18 @@ class DataStoreSettingsStore(private val dataStore: DataStore<Preferences>) : Se
         }
     }
 
+    override val onboardingCompleted: Flow<Boolean> =
+        dataStore.data.map { prefs -> prefs[KEY_ONBOARDING_COMPLETED] ?: false }
+
+    override suspend fun setOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_ONBOARDING_COMPLETED] = completed }
+    }
+
     companion object {
         private val KEY_PROVIDER_ID = stringPreferencesKey("translation_provider_id")
         private val KEY_BASE_URL = stringPreferencesKey("translation_base_url")
         private val KEY_MODEL = stringPreferencesKey("translation_model")
         private val KEY_TARGET_LANG = stringPreferencesKey("translation_target_lang")
+        private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
 }
