@@ -7,6 +7,13 @@ kotlin {
 }
 
 dependencies {
+    // Контракт Source/SManga/SourceException + парсеры дат/номеров глав.
+    api(project(":source:api"))
+    // RateLimiter, asAppError, CloudflareBlocked-семантика; OkHttp транзитивно.
+    implementation(project(":core:network"))
+    // HTML-парсинг тем Madara (WordPress).
+    implementation(libs.jsoup)
+
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.kotlinx.coroutines.test)

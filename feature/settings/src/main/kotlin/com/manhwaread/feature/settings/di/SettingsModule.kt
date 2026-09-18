@@ -1,6 +1,5 @@
 package com.manhwaread.feature.settings.di
 
-import com.manhwaread.core.network.HttpClientFactory
 import com.manhwaread.core.translation.TranslationProviderFactory
 import dagger.Module
 import dagger.Provides
@@ -12,11 +11,8 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object SettingsModule {
-    // Единый OkHttpClient провайдеров перевода (интерсепторы фазы 3).
-    @Provides
-    @Singleton
-    fun provideProviderHttpClient(): OkHttpClient = HttpClientFactory.create()
-
+    // OkHttpClient приходит из DI приложения (:app SourceModule, ФАЗА 13) —
+    // единый клиент с Cloudflare-решателем и дисковым кэшем.
     @Provides
     @Singleton
     fun provideTranslationProviderFactory(httpClient: OkHttpClient): TranslationProviderFactory =

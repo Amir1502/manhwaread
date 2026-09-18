@@ -52,6 +52,12 @@ dependencies {
     implementation(project(":core:database"))
     // Настройки провайдера перевода подключены к NavHost (ФАЗА 12).
     implementation(project(":feature:settings"))
+    // Источники и сетевой слой регистрируются в SourceModule (ФАЗА 13).
+    implementation(project(":core:network"))
+    implementation(project(":source:api"))
+    implementation(project(":source:mangadex"))
+    implementation(project(":source:madara"))
+    implementation(project(":source:asura"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
