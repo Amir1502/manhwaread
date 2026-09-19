@@ -11,4 +11,7 @@
     <string name="reader_bubble_original">Original</string>
     <string name="reader_bubble_translated">Translation</string>
     <string name="reader_no_translation">No translation yet</string>
+    <string name="reader_page_corrupted">Page image is damaged</string>
+    <string name="reader_page_failed">Could not decode page</string>
+    <string name="reader_page_retry">Retry</string>
 </resources>

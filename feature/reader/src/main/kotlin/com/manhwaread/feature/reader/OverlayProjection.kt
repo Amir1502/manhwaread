@@ -6,7 +6,7 @@ import com.manhwaread.core.vision.contains
 
 // Цвет маскирующей подложки, если цвет заполнения бабла не известен:
 // белый — как бумага типового облачка реплики.
-private val DefaultBackgroundColor = 0xFFFFFFFF.toInt()
+private const val DEFAULT_BACKGROUND_COLOR = 0xFFFFFFFF.toInt()
 
 // Проекция векторного спека в экранные координаты: размеры и интервалы
 // умножаются на scale — перевод остаётся резким на любом зуме
@@ -54,7 +54,7 @@ private fun BubbleHitArea.projectBackground(transform: ViewportTransform): Proje
         polygon = polygon.map { point ->
             PointF(x = transform.toScreenX(point.x), y = transform.toScreenY(point.y))
         },
-        colorArgb = fillColorArgb ?: DefaultBackgroundColor,
+        colorArgb = fillColorArgb ?: DEFAULT_BACKGROUND_COLOR,
     )
 
 // Тап по баблу: экранная точка переводится в координаты изображения,

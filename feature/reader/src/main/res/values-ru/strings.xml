@@ -11,4 +11,7 @@
     <string name="reader_bubble_original">Оригинал</string>
     <string name="reader_bubble_translated">Перевод</string>
     <string name="reader_no_translation">Перевода пока нет</string>
+    <string name="reader_page_corrupted">Файл страницы повреждён</string>
+    <string name="reader_page_failed">Не удалось декодировать страницу</string>
+    <string name="reader_page_retry">Повторить</string>
 </resources>

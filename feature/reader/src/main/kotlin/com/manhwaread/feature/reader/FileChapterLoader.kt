@@ -23,14 +23,17 @@ class FileChapterLoader(
         val overlaysByPage = overlays.groupBy { it.pageIndex }
         val bubblesByPage = meta.bubbles.groupBy { it.pageIndex }
         val pages = pageFiles(chapterDir).mapIndexed { index, file ->
-            val (width, height) = imageSizeReader.read(file)
+            // Битый файл страницы не убивает главу: страница без читаемых
+            // размеров помечается corrupted — читалка покажет заглушку.
+            val size = runCatching { imageSizeReader.read(file) }.getOrNull()
             ReaderPage(
                 index = index,
                 imageFile = file,
-                widthPx = width,
-                heightPx = height,
+                widthPx = size?.first ?: 0,
+                heightPx = size?.second ?: 0,
                 overlays = overlaysByPage[index].orEmpty(),
                 bubbles = bubblesByPage[index].orEmpty(),
+                isCorrupted = size == null,
             )
         }
         ReaderChapter(title = meta.title, pages = pages)

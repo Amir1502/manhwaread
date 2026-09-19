@@ -162,6 +162,10 @@ private fun ReaderContent(
     }
 }
 
+// Высота элемента ленты для битой страницы (heightPx == 0): фиксированный
+// плейсхолдер, чтобы сообщение об ошибке было видно и в вебтун-режиме.
+private const val CORRUPT_PAGE_HEIGHT_DP = 240
+
 // Вебтун: непрерывная лента без швов — интервалы между элементами нулевые,
 // высота элемента точно равна высоте страницы в текущем масштабе.
 @Composable
@@ -192,7 +196,11 @@ private fun WebtoonList(state: ReaderUiState, viewModel: ReaderViewModel) {
         items(count = pages.size, key = { position -> pages[position].index }) { position ->
             val page = pages[position]
             val transform = state.transformFor(page.index)
-            val itemHeight = with(density) { (page.heightPx * transform.scale).toDp() }
+            val itemHeight = if (page.isCorrupted) {
+                CORRUPT_PAGE_HEIGHT_DP.dp
+            } else {
+                with(density) { (page.heightPx * transform.scale).toDp() }
+            }
             Box(modifier = Modifier.fillMaxWidth().height(itemHeight)) {
                 ReaderPageView(
                     page = page,

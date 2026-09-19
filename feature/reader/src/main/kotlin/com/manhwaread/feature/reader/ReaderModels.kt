@@ -73,6 +73,9 @@ data class BubbleHitArea(
 
 // Страница, готовая к рендеру: файл + размеры (нужны для раскладки ДО
 // декодирования) + векторный слой перевода + области баблов.
+// isCorrupted — аддитивный флаг: файл страницы не читается (битый/не
+// изображение), размеры неизвестны (0×0); читалка показывает заглушку
+// вместо падения всей главы.
 data class ReaderPage(
     val index: Int,
     val imageFile: File,
@@ -80,6 +83,7 @@ data class ReaderPage(
     val heightPx: Int,
     val overlays: List<OverlaySpec>,
     val bubbles: List<BubbleHitArea>,
+    val isCorrupted: Boolean = false,
 ) {
     val aspectRatio: Float get() = widthPx.toFloat() / heightPx.toFloat()
 }

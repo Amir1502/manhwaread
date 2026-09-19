@@ -61,11 +61,82 @@ class TileMathTest {
     }
 
     @Test
-    fun `sample size grows when zoomed out`() {
-        assertEquals(1, sampleSizeFor(1f))
-        assertEquals(1, sampleSizeFor(2.5f))
-        assertEquals(2, sampleSizeFor(0.4f))
-        assertEquals(4, sampleSizeFor(0.2f))
+    fun `sample size grows when page shown downscaled`() {
+        // Абсолютный масштаб: 1x и крупнее — полномерное декодирование.
+        assertEquals(1, sampleSizeForScale(1f))
+        assertEquals(1, sampleSizeForScale(2.5f))
+        assertEquals(1, sampleSizeForScale(2f))
+        // 0.5: 1*2*0.5=1 <= 1 → 2; 2*2*0.5=2 > 1 → стоп.
+        assertEquals(2, sampleSizeForScale(0.5f))
+        assertEquals(2, sampleSizeForScale(0.4f))
+        // 0.25: 1*2*0.25=0.5 → 2; 2*2*0.25=1 <= 1 → 4; 4*2*0.25=2 > 1 → стоп.
+        assertEquals(4, sampleSizeForScale(0.25f))
+        assertEquals(4, sampleSizeForScale(0.2f))
+    }
+
+    @Test
+    fun `band fully inside image maps to image rect`() {
+        val transform = ViewportTransform.IDENTITY
+        val rect = visibleImageRectForBand(
+            transform = transform,
+            bandLeftPx = 10f,
+            bandTopPx = 20f,
+            bandRightPx = 300f,
+            bandBottomPx = 400f,
+            imageWidthPx = 800,
+            imageHeightPx = 20000,
+        )
+        assertEquals(TileRect(10, 20, 301, 401), rect)
+    }
+
+    @Test
+    fun `band partially outside image is clamped`() {
+        val transform = ViewportTransform.IDENTITY
+        val rect = visibleImageRectForBand(
+            transform = transform,
+            bandLeftPx = -100f,
+            bandTopPx = -50f,
+            bandRightPx = 500f,
+            bandBottomPx = 300f,
+            imageWidthPx = 800,
+            imageHeightPx = 20000,
+        )
+        assertEquals(TileRect(0, 0, 501, 301), rect)
+    }
+
+    @Test
+    fun `band fully outside image yields null`() {
+        // Изображение на экране занимает [-5000, -4200): полоса вью его не касается.
+        val transform = ViewportTransform(scale = 1f, offsetX = 5000f, offsetY = 0f)
+        assertNull(
+            visibleImageRectForBand(
+                transform = transform,
+                bandLeftPx = 0f,
+                bandTopPx = 0f,
+                bandRightPx = 400f,
+                bandBottomPx = 800f,
+                imageWidthPx = 800,
+                imageHeightPx = 20000,
+            ),
+        )
+    }
+
+    @Test
+    fun `visible rect for webtoon band limited to band not full strip`() {
+        // Страница 800×20000 показана fit-to-width (scale=1.35); видимая
+        // полоса — нижняя половина вью 1080×2400: в координатах изображения
+        // это ~889 px, а не все 20000.
+        val transform = fitToWidth(800, 1080f)
+        val rect = visibleImageRectForBand(
+            transform = transform,
+            bandLeftPx = 0f,
+            bandTopPx = 1200f,
+            bandRightPx = 1080f,
+            bandBottomPx = 2400f,
+            imageWidthPx = 800,
+            imageHeightPx = 20000,
+        )!!
+        assertTrue(rect.height < 1000, "band height ${rect.height} must stay near band, not full strip")
     }
 
     @Test

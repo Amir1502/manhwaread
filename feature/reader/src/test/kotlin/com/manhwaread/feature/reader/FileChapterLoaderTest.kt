@@ -7,6 +7,7 @@ import com.manhwaread.core.vision.PointF
 import com.manhwaread.core.vision.RectF
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -91,6 +92,30 @@ class FileChapterLoaderTest {
         val chapter = loader().loadChapter(tempDir)
         assertEquals(1, chapter.pages.size)
         assertTrue(chapter.pages[0].overlays.isEmpty())
+    }
+
+    @Test
+    fun `corrupt page file is marked but chapter still loads`() = runBlocking {
+        writePage("page1.png")
+        writePage("page2.png")
+        writePage("page3.png")
+        val corruptName = "page2.png"
+        val failingReader = object : ImageSizeReader {
+            override fun read(file: File): Pair<Int, Int> {
+                require(file.name != corruptName) { "bad image: ${file.name}" }
+                return 800 to 1200
+            }
+        }
+        val chapter = FileChapterLoader(imageSizeReader = failingReader).loadChapter(tempDir)
+        assertEquals(3, chapter.pages.size)
+        val corrupt = chapter.pages[1]
+        assertTrue(corrupt.isCorrupted)
+        assertEquals(0, corrupt.widthPx)
+        assertEquals(0, corrupt.heightPx)
+        assertFalse(chapter.pages[0].isCorrupted)
+        assertFalse(chapter.pages[2].isCorrupted)
+        assertEquals(800, chapter.pages[0].widthPx)
+        assertEquals(1200, chapter.pages[2].heightPx)
     }
 
     @Test

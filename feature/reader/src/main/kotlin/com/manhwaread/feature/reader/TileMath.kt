@@ -21,17 +21,42 @@ fun tileCount(imageWidthPx: Int, imageHeightPx: Int, tileSize: Int = DEFAULT_TIL
 }
 
 // Видимый прямоугольник изображения в его пикселях; null, если вьюпорт вне изображения.
+// Делегирует полосовой версии: вся математика живёт в visibleImageRectForBand.
 fun visibleImageRect(
     transform: ViewportTransform,
     viewWidthPx: Float,
     viewHeightPx: Float,
     imageWidthPx: Int,
     imageHeightPx: Int,
+): TileRect? = visibleImageRectForBand(
+    transform = transform,
+    bandLeftPx = 0f,
+    bandTopPx = 0f,
+    bandRightPx = viewWidthPx,
+    bandBottomPx = viewHeightPx,
+    imageWidthPx = imageWidthPx,
+    imageHeightPx = imageHeightPx,
+)
+
+// Видимый прямоугольник изображения для произвольной полосы вью в её
+// экранных координатах; null, если полоса не пересекает изображение.
+// В вебтуне вью страницы ростом со всю полосу (например 800×20000), но
+// реально на экране видна лишь полоса LazyColumn — обрезка тайловой
+// математики по фактически видимой полосе исключает декодирование всей
+// страницы и выбивание LRU-кэша (чёрные дыры на длинных страницах).
+fun visibleImageRectForBand(
+    transform: ViewportTransform,
+    bandLeftPx: Float,
+    bandTopPx: Float,
+    bandRightPx: Float,
+    bandBottomPx: Float,
+    imageWidthPx: Int,
+    imageHeightPx: Int,
 ): TileRect? {
-    val left = floor(transform.toImageX(0f).toDouble()).toInt()
-    val top = floor(transform.toImageY(0f).toDouble()).toInt()
-    val right = transform.toImageX(viewWidthPx).toInt() + 1
-    val bottom = transform.toImageY(viewHeightPx).toInt() + 1
+    val left = floor(transform.toImageX(bandLeftPx).toDouble()).toInt()
+    val top = floor(transform.toImageY(bandTopPx).toDouble()).toInt()
+    val right = transform.toImageX(bandRightPx).toInt() + 1
+    val bottom = transform.toImageY(bandBottomPx).toInt() + 1
     val clampedLeft = left.coerceIn(0, imageWidthPx)
     val clampedTop = top.coerceIn(0, imageHeightPx)
     val clampedRight = right.coerceIn(0, imageWidthPx)
@@ -67,14 +92,20 @@ fun visibleTiles(
     return tiles
 }
 
-// Шаг прореживания декодирования: при относительном зуме < 1 декодируем
-// разреженнее, объём декодирования остаётся ограниченным вьюпортом.
-fun sampleSizeFor(relativeZoom: Float): Int {
-    if (relativeZoom >= 1f) {
+// Шаг прореживания декодирования по АБСОЛЮТНОМУ экранному масштабу:
+// наибольшая степень двойки sample, при которой sample * 2 * absoluteScale > 1.
+// Страница, показанная уменьшенной (scale ~ 0.5), декодируется в 1/2 или
+// 1/4 разрешения — экономия памяти и времени декодирования вместо
+// полномерного растра. Прежняя версия получала относительный зум
+// (transform.scale / baseScale, всегда >= 1 из-за клампа) и поэтому
+// никогда не прореживала декодирование.
+fun sampleSizeForScale(absoluteScale: Float): Int {
+    // Нулевой/отрицательный масштаб недопустим: без защиты цикл ниже бесконечен.
+    if (absoluteScale <= 0f) {
         return 1
     }
     var sample = 1
-    while (sample * 2 * relativeZoom <= 1f) {
+    while (sample * 2 * absoluteScale <= 1f) {
         sample *= 2
     }
     return sample
