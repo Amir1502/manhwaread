@@ -94,6 +94,11 @@ class HistoryViewModelTest {
 
         override suspend fun setInLibrary(id: Long, inLibrary: Boolean, nowMs: Long) = Unit
 
+        // Переведённый тайтл: фейк хранит строки, обновляем поле напрямую.
+        override suspend fun setTitleRu(id: Long, titleRu: String?) {
+            rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
+        }
+
         override suspend fun deleteById(id: Long) {
             rows.remove(id)
         }

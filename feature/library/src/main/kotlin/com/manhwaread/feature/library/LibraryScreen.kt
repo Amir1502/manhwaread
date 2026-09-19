@@ -142,7 +142,8 @@ private fun LibraryCard(manga: MangaEntity, actions: LibraryActions) {
                 }
             }
             Text(
-                text = manga.title,
+                // Русский перевод тайтла приоритетен; откат — название из источника.
+                text = manga.titleRu ?: manga.title,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

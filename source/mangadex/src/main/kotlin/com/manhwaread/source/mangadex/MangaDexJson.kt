@@ -21,7 +21,9 @@ import java.time.format.DateTimeParseException
 internal object MangaDexJson {
     private const val COVER_CDN_BASE = "https://uploads.mangadex.org/covers"
     private const val UNKNOWN_CHAPTER_NUMBER = -1f
-    private val TITLE_LANG_PRIORITY = listOf("en", "ja", "ja-ro", "ru")
+
+    // Целевой язык продукта — русский: ru-альтернатива тайтла побеждает, когда есть.
+    private val TITLE_LANG_PRIORITY = listOf("ru", "en", "ja", "ja-ro")
     private val NSFW_RATINGS = setOf("erotica", "pornographic")
 
     /** Массив `data` из ответа-коллекции. */

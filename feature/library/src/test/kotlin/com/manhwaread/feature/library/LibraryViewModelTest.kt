@@ -76,6 +76,11 @@ class LibraryViewModelTest {
             publish()
         }
 
+        override suspend fun setTitleRu(id: Long, titleRu: String?) {
+            rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
+            publish()
+        }
+
         override suspend fun deleteById(id: Long) {
             rows.remove(id)
             publish()
@@ -147,6 +152,17 @@ class LibraryViewModelTest {
         mangaDao.seed(manga(id = 2L, title = "Solo Max"))
         advanceUntilIdle()
         assertEquals(listOf(1L, 2L), viewModel.uiState.value.items.map { it.id })
+    }
+
+    @Test
+    fun `items carry russian title for card display`() = runTest {
+        mangaDao.seed(manga(id = 1L, title = "Solo Leveling").copy(titleRu = "Поднятие уровня в одиночку"))
+        mangaDao.seed(manga(id = 2L, title = "Berserk"))
+        val viewModel = LibraryViewModel(mangaDao)
+        advanceUntilIdle()
+        val items = viewModel.uiState.value.items
+        // Карточка показывает titleRu ?: title: перевод у первого, оригинал у второго.
+        assertEquals(listOf("Поднятие уровня в одиночку", "Berserk"), items.map { it.titleRu ?: it.title })
     }
 
     @Test

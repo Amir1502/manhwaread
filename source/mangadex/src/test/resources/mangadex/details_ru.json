@@ -1,0 +1,35 @@
+{
+  "result": "ok",
+  "response": "entity",
+  "data": {
+    "id": "f4e10b2a-5555-4b9d-8c2e-1b2c33d4e5f6",
+    "type": "manga",
+    "attributes": {
+      "title": {
+        "en": "Solo Leveling",
+        "ko": "나 혼자만 레벨업",
+        "ru": "Поднятие уровня в одиночку"
+      },
+      "description": {
+        "en": "E-rank hunter Jinwoo Sung gains the power of the System."
+      },
+      "status": "completed",
+      "contentRating": "safe",
+      "year": 2018,
+      "tags": [
+        {
+          "id": "tag-action",
+          "type": "tag",
+          "attributes": { "name": { "en": "Action" } }
+        }
+      ]
+    },
+    "relationships": [
+      {
+        "id": "author-4",
+        "type": "author",
+        "attributes": { "name": "Chugong" }
+      }
+    ]
+  }
+}

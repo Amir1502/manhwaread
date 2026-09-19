@@ -76,6 +76,35 @@ class MangaDaoTest : DaoTestBase() {
     }
 
     @Test
+    fun `set title ru roundtrip stores and clears translation`() = runBlocking {
+        val dao = db.mangaDao()
+        val id = dao.upsert(DatabaseFixtures.manga())
+        // Новая колонка по умолчанию null — старые вызывающие стороны не меняются.
+        assertNull(dao.findById(id)?.titleRu)
+        dao.setTitleRu(id, "Поднятие уровня в одиночку")
+        assertEquals("Поднятие уровня в одиночку", dao.findById(id)?.titleRu)
+        dao.setTitleRu(id, null)
+        assertNull(dao.findById(id)?.titleRu)
+        // UPDATE несуществующей строки — безопасный no-op.
+        dao.setTitleRu(999L, "Вселенная")
+        assertNull(dao.findById(999L))
+    }
+
+    @Test
+    fun `upsert roundtrips title ru column`() = runBlocking {
+        val dao = db.mangaDao()
+        val id = dao.upsert(DatabaseFixtures.manga().copy(titleRu = "Поднятие уровня в одиночку"))
+        assertEquals("Поднятие уровня в одиночку", dao.findById(id)?.titleRu)
+        // toEntityPreserving переносит titleRu из существующей строки — upsert его сохраняет.
+        val updated = dao.upsertBySourceUrl(
+            DatabaseFixtures.manga(title = "Solo Leveling (RAWR)").copy(titleRu = "Поднятие уровня (RAWR)"),
+        )
+        assertEquals(id, updated)
+        assertEquals("Поднятие уровня (RAWR)", dao.findById(id)?.titleRu)
+        assertEquals("Solo Leveling (RAWR)", dao.findById(id)?.title)
+    }
+
+    @Test
     fun `find by source url locates manga`() = runBlocking {
         db.mangaDao().upsert(DatabaseFixtures.manga(sourceId = 7L, url = "/manga/x"))
         assertNull(db.mangaDao().findBySourceUrl(9L, "/manga/x"))

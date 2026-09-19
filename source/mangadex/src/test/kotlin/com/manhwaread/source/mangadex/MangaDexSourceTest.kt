@@ -78,7 +78,8 @@ class MangaDexSourceTest {
         val first = page.mangas[0]
         assertEquals("/manga/a0a66f7b-1111-4c60-b1b4-9f1c6e0d0e01", first.url)
         assertEquals(MangaDexSource.SOURCE_ID, first.sourceId)
-        assertEquals("Solo Leveling", first.title)
+        // Есть ru-альтернатива тайтла — приоритет у русского (целевой язык продукта).
+        assertEquals("Поднятие уровня в одиночку", first.title)
         assertEquals(MangaStatus.COMPLETED, first.status)
         assertEquals("Охотник E-ранга Сон Джин-Ву получает силу системы.", first.description)
         assertEquals(listOf("Action", "Fantasy"), first.genres)
@@ -92,6 +93,7 @@ class MangaDexSourceTest {
         assertFalse(first.nsfw)
 
         val second = page.mangas[1]
+        // Ru-тайтла нет — откат на en (ja проигрывает английскому).
         assertEquals("Berserk", second.title)
         assertEquals(MangaStatus.HIATUS, second.status)
         assertTrue(second.nsfw)
@@ -167,6 +169,17 @@ class MangaDexSourceTest {
         val query = server.takeRequest().requestUrl?.query.orEmpty()
         assertTrue(query.contains("includes[]=author"), query)
         assertTrue(query.contains("includes[]=artist"), query)
+    }
+
+    @Test
+    fun `details prefers russian alt title over english`() = runBlocking {
+        enqueueJson("details_ru.json")
+        val stub = mangaStub("/manga/f4e10b2a-5555-4b9d-8c2e-1b2c33d4e5f6")
+        val details = source.getDetails(stub)
+
+        assertEquals("Поднятие уровня в одиночку", details.title)
+        assertEquals("Chugong", details.author)
+        assertTrue(details.initialized)
     }
 
     @Test

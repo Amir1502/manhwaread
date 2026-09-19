@@ -49,6 +49,11 @@ interface MangaDao {
     )
     suspend fun setInLibrary(id: Long, inLibrary: Boolean, nowMs: Long)
 
+    // Русский тайтл пишется точечным UPDATE: обновление строки источником
+    // (upsertBySourceUrl) перевод не затирает, а сам он обновляется независимо.
+    @Query("UPDATE manga SET titleRu = :titleRu WHERE id = :id")
+    suspend fun setTitleRu(id: Long, titleRu: String?)
+
     @Query("DELETE FROM manga WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

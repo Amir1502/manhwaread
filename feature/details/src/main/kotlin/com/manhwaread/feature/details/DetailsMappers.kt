@@ -10,7 +10,8 @@ import com.manhwaread.source.api.SManga
 
 /**
  * SManga → MangaEntity с сохранением библиотечного состояния: upsertBySourceUrl
- * заменяет строку целиком, поэтому inLibrary/addedAtMs/id берутся из существующей.
+ * заменяет строку целиком, поэтому id/inLibrary/addedAtMs/titleRu берутся из
+ * существующей (русский тайтл накапливается локально — источник о нём не знает).
  */
 internal fun SManga.toEntityPreserving(existing: MangaEntity?): MangaEntity = MangaEntity(
     id = existing?.id ?: 0L,
@@ -26,6 +27,7 @@ internal fun SManga.toEntityPreserving(existing: MangaEntity?): MangaEntity = Ma
     nsfw = nsfw,
     inLibrary = existing?.inLibrary ?: false,
     addedAtMs = existing?.addedAtMs ?: 0L,
+    titleRu = existing?.titleRu,
 )
 
 /** SChapter → ChapterEntity: сезон из названия, номер — из источника или парсера. */

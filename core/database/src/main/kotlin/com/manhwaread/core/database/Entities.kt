@@ -31,6 +31,8 @@ data class MangaEntity(
     val nsfw: Boolean = false,
     val inLibrary: Boolean = false,
     val addedAtMs: Long = 0L,
+    // Русский тайтл: переводится LLM-провайдером и хранится локально (null — ещё не переведён).
+    val titleRu: String? = null,
 )
 
 @Entity(
