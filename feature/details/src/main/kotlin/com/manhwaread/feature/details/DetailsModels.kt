@@ -18,7 +18,8 @@ sealed interface DetailsMessage {
     data object AddedToLibrary : DetailsMessage
     data object RemovedFromLibrary : DetailsMessage
 
-    // Глава уже скачана — открываем офлайн-читалку вместо постановки в очередь (ФАЗА 15).
+    // Открыть читалку по клику на главу: скачанная глава читается офлайн,
+    // нескачанная стримится с источника на уровне приложения.
     data class OpenReader(val mangaId: Long, val chapterId: Long) : DetailsMessage
 }
 
@@ -27,6 +28,7 @@ data class DetailsActions(
     val onBack: () -> Unit,
     val onToggleLibrary: () -> Unit,
     val onChapterClick: (ChapterEntity) -> Unit,
+    val onChapterDownload: (ChapterEntity) -> Unit,
     val onOpenReader: (mangaId: Long, chapterId: Long) -> Unit,
     val onRetry: () -> Unit,
     val onMessageShown: () -> Unit,

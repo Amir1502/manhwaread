@@ -8,7 +8,13 @@ import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.DownloadTaskDao
 import com.manhwaread.core.database.DownloadTaskEntity
 import com.manhwaread.core.database.MangaDao
+import com.manhwaread.core.datastore.ApiKeyStore
+import com.manhwaread.core.datastore.SettingsStore
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.translation.ProviderConfig
+import com.manhwaread.core.translation.TitleTranslator
+import com.manhwaread.core.translation.TranslationProvider
+import com.manhwaread.core.translation.TranslationProviderFactory
 import com.manhwaread.source.api.SManga
 import com.manhwaread.source.api.SourceException
 import com.manhwaread.source.api.SourceRegistry
@@ -18,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,8 +32,10 @@ import javax.inject.Inject
 /**
  * ViewModel карточки тайтла (ФАЗА 14): кэш из БД показывается мгновенно, затем
  * источник обновляет детали и список глав (read-флаги глав не затираются —
- * refreshChapters). Клик по главе ставит задачу скачивания в очередь;
- * исполнение очереди — ФАЗА 15.
+ * refreshChapters). Клик по главе всегда открывает читалку (нескачанная глава
+ * стримится с источника); скачивание — явное действие [onChapterDownloadClick].
+ * Тайтл переводится на русский выбранным провайдером один раз и хранится в
+ * [MangaDao.setTitleRu] — обновление карточки его не затирает.
  *
  * Вход через [openById] (библиотека/история) или [openBySourceUrl] (каталог).
  */
@@ -36,6 +45,9 @@ class DetailsViewModel @Inject constructor(
     private val mangaDao: MangaDao,
     private val chapterDao: ChapterDao,
     private val downloadTaskDao: DownloadTaskDao,
+    private val providerFactory: TranslationProviderFactory,
+    private val settingsStore: SettingsStore,
+    private val apiKeyStore: ApiKeyStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DetailsUiState())
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
@@ -84,17 +96,17 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
-    // Клик по главе (ФАЗА 15): скачанная глава открывается офлайн в читалке,
-    // иначе ставится в очередь скачивания.
+    // Клик по главе: читалка открывается сразу — нескачанная глава стримится
+    // с источника на уровне приложения (чтение без загрузки, без перевода).
     fun onChapterClick(chapter: ChapterEntity) {
+        _uiState.update {
+            it.copy(message = DetailsMessage.OpenReader(mangaId = chapter.mangaId, chapterId = chapter.id))
+        }
+    }
+
+    // Явная кнопка скачивания главы: задача ставится в очередь загрузок.
+    fun onChapterDownloadClick(chapter: ChapterEntity) {
         viewModelScope.launch {
-            val latest = downloadTaskDao.latestForChapter(chapter.id)
-            if (latest?.status == DownloadStatus.COMPLETED) {
-                _uiState.update {
-                    it.copy(message = DetailsMessage.OpenReader(mangaId = chapter.mangaId, chapterId = chapter.id))
-                }
-                return@launch
-            }
             downloadTaskDao.upsert(
                 DownloadTaskEntity(
                     mangaId = chapter.mangaId,
@@ -143,6 +155,7 @@ class DetailsViewModel @Inject constructor(
             val mangaId = mangaDao.upsertBySourceUrl(details.toEntityPreserving(existing))
             val fresh = mangaDao.findById(mangaId)
             _uiState.update { it.copy(manga = fresh) }
+            ensureTitleTranslated(mangaId, details.title)
             observeChapters(mangaId)
             val chapters = source.getChapterList(details)
             chapterDao.refreshChapters(chapters.map { chapter -> chapter.toEntity(mangaId = mangaId) })
@@ -162,5 +175,32 @@ class DetailsViewModel @Inject constructor(
                 _uiState.update { it.copy(chapters = chapters) }
             }
         }
+    }
+
+    // Перевод тайтла выполняется фоном и один раз на тайтл: если titleRu уже
+    // сохранён или провайдер не выбран, запрос к LLM не делается.
+    private fun ensureTitleTranslated(mangaId: Long, title: String) {
+        viewModelScope.launch {
+            if (mangaDao.findById(mangaId)?.titleRu != null) return@launch
+            val provider = currentTitleProvider() ?: return@launch
+            val translated = TitleTranslator(provider).translate(title) ?: return@launch
+            mangaDao.setTitleRu(mangaId, translated)
+            if (_uiState.value.manga?.id == mangaId) {
+                _uiState.update { it.copy(manga = mangaDao.findById(mangaId)) }
+            }
+        }
+    }
+
+    // Провайдер перевода из настроек — собирается как в очереди перевода.
+    private suspend fun currentTitleProvider(): TranslationProvider? {
+        val settings = settingsStore.translationSettings.first()
+        if (!settings.isProviderSelected) return null
+        val config = ProviderConfig(
+            id = settings.providerId,
+            apiKey = apiKeyStore.apiKey(settings.providerId).orEmpty(),
+            baseUrl = settings.baseUrl.trim().ifBlank { null },
+            model = settings.model.trim().ifBlank { null },
+        )
+        return providerFactory.create(config)
     }
 }

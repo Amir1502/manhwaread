@@ -5,4 +5,7 @@
     <string name="nav_history">История</string>
     <string name="nav_downloads">Загрузки</string>
     <string name="nav_settings">Настройки</string>
+    <string name="reader_streaming_progress">Загрузка страниц %1$d/%2$d</string>
+    <string name="reader_stream_retry">Повторить</string>
+    <string name="reader_stream_back">Назад</string>
 </resources>

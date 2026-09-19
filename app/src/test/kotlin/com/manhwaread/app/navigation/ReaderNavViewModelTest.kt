@@ -1,10 +1,15 @@
 package com.manhwaread.app.navigation
 
+import com.manhwaread.app.reader.StreamingChapterLoader
+import com.manhwaread.core.common.AppError
+import com.manhwaread.core.common.DomainResult
 import com.manhwaread.core.database.ChapterDao
 import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.HistoryDao
 import com.manhwaread.core.database.HistoryEntity
 import com.manhwaread.feature.downloads.queue.ChapterDirs
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -93,12 +98,23 @@ class ReaderNavViewModelTest {
 
     private val historyDao = FakeHistoryDao()
     private val chapterDao = FakeReaderChapterDao()
+    private val streamingLoader = mockk<StreamingChapterLoader>()
 
     private fun viewModel(): ReaderNavViewModel =
-        ReaderNavViewModel(ChapterDirs(tempDir), historyDao, chapterDao)
+        ReaderNavViewModel(ChapterDirs(tempDir), historyDao, chapterDao, streamingLoader)
+
+    // Каталог скачанной главы формата FileChapterLoader: метаданные + страница.
+    private fun prepareOfflineChapter(chapterId: Long = 10L): File {
+        val dir = File(tempDir, "chapter_$chapterId")
+        dir.mkdirs()
+        File(dir, "page001.png").writeBytes(byteArrayOf(1, 2, 3))
+        File(dir, "chapter.json").writeText("""{"title":"offline","bubbles":[]}""")
+        return dir
+    }
 
     @Test
-    fun `open resolves chapter dir and restores page from history`() = runTest {
+    fun `open resolves offline chapter dir and restores page from history`() = runTest {
+        val offlineDir = prepareOfflineChapter()
         historyDao.entries[10L] = HistoryEntity(mangaId = 1L, chapterId = 10L, pageIndex = 5, lastReadMs = 100L)
         val viewModel = viewModel()
 
@@ -107,12 +123,14 @@ class ReaderNavViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state.isOpen)
+        assertFalse(state.isStreaming)
         assertEquals(5, state.initialPageIndex)
-        assertEquals(File(tempDir, "chapter_10"), state.chapterDir)
+        assertEquals(offlineDir, state.chapterDir)
     }
 
     @Test
     fun `open without history starts at page zero`() = runTest {
+        prepareOfflineChapter()
         val viewModel = viewModel()
 
         viewModel.open(mangaId = 1L, chapterId = 10L)
@@ -124,7 +142,76 @@ class ReaderNavViewModelTest {
     }
 
     @Test
+    fun `incomplete offline dir triggers streaming instead of open`() = runTest {
+        // Каталог есть, но страниц нет (или нет chapter.json) — глава не готова офлайн.
+        File(tempDir, "chapter_10").mkdirs()
+        val streamDir = File(tempDir, "stream/chapter_10")
+        coEvery { streamingLoader.ensureStreamed(eq(10L), any()) } coAnswers {
+            DomainResult.success(streamDir)
+        }
+        val viewModel = viewModel()
+
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isOpen)
+        assertEquals(streamDir, state.chapterDir)
+    }
+
+    @Test
+    fun `open streams chapter and reports progress`() = runTest {
+        val streamDir = File(tempDir, "stream/chapter_10")
+        coEvery { streamingLoader.ensureStreamed(eq(10L), any()) } coAnswers {
+            val progress = secondArg<(Int, Int) -> Unit>()
+            progress(1, 2)
+            progress(2, 2)
+            DomainResult.success(streamDir)
+        }
+        val viewModel = viewModel()
+
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isOpen)
+        assertFalse(state.isStreaming)
+        assertNull(state.streamError)
+        assertEquals(streamDir, state.chapterDir)
+        assertEquals(2, state.streamDone)
+        assertEquals(2, state.streamTotal)
+    }
+
+    @Test
+    fun `stream failure sets error and retry recovers`() = runTest {
+        coEvery { streamingLoader.ensureStreamed(eq(10L), any()) } coAnswers {
+            DomainResult.failure(AppError.SourceLayoutChanged)
+        }
+        val viewModel = viewModel()
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+
+        val failed = viewModel.uiState.value
+        assertFalse(failed.isOpen)
+        assertFalse(failed.isStreaming)
+        assertEquals(AppError.SourceLayoutChanged, failed.streamError)
+
+        val streamDir = File(tempDir, "stream/chapter_10")
+        coEvery { streamingLoader.ensureStreamed(eq(10L), any()) } coAnswers {
+            DomainResult.success(streamDir)
+        }
+        viewModel.retryStream()
+        advanceUntilIdle()
+
+        val recovered = viewModel.uiState.value
+        assertTrue(recovered.isOpen)
+        assertNull(recovered.streamError)
+        assertEquals(streamDir, recovered.chapterDir)
+    }
+
+    @Test
     fun `page changed records history and marks chapter read once`() = runTest {
+        prepareOfflineChapter()
         val viewModel = viewModel()
         viewModel.open(mangaId = 1L, chapterId = 10L)
         advanceUntilIdle()

@@ -135,6 +135,9 @@ dependencies {
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.junit)
     testImplementation(libs.hilt.android.testing)
+    // Стриминг главы без скачивания: HTTP-фейк и моки финального загрузчика.
+    testImplementation(libs.mockwebserver)
+    testImplementation(libs.mockk)
     kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)

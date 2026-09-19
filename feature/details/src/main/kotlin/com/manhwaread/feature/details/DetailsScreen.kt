@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -84,6 +85,7 @@ fun DetailsRoute(
             onBack = onBack,
             onToggleLibrary = viewModel::onToggleLibrary,
             onChapterClick = viewModel::onChapterClick,
+            onChapterDownload = viewModel::onChapterDownloadClick,
             onOpenReader = onOpenReader,
             onRetry = viewModel::onRetry,
             onMessageShown = viewModel::onMessageShown,
@@ -123,7 +125,9 @@ fun DetailsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = state.manga?.title ?: stringResource(R.string.details_title),
+                        // Переведённый тайтл приоритетнее исходного (titleRu живёт в БД).
+                        text = state.manga?.let { manga -> manga.titleRu ?: manga.title }
+                            ?: stringResource(R.string.details_title),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -270,13 +274,19 @@ private fun DetailsContent(
             }
         }
         items(state.chapters, key = { chapter -> chapter.id }) { chapter ->
-            ChapterRow(chapter = chapter, onClick = { actions.onChapterClick(chapter) })
+            ChapterRow(
+                chapter = chapter,
+                onClick = { actions.onChapterClick(chapter) },
+                onDownload = { actions.onChapterDownload(chapter) },
+            )
         }
     }
 }
 
+// Строка главы: клик открывает читалку (скачанную офлайн, нескачанную —
+// стримингом), кнопка скачивания ставит главу в очередь загрузок.
 @Composable
-private fun ChapterRow(chapter: ChapterEntity, onClick: () -> Unit) {
+private fun ChapterRow(chapter: ChapterEntity, onClick: () -> Unit, onDownload: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -307,6 +317,12 @@ private fun ChapterRow(chapter: ChapterEntity, onClick: () -> Unit) {
                 imageVector = Icons.Filled.CheckCircle,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        IconButton(onClick = onDownload) {
+            Icon(
+                imageVector = Icons.Filled.Download,
+                contentDescription = stringResource(R.string.details_download_chapter),
             )
         }
     }

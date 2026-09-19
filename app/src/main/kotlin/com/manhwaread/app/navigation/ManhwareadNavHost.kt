@@ -1,19 +1,26 @@
 package com.manhwaread.app.navigation
 
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -24,6 +31,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.manhwaread.app.R
+import com.manhwaread.core.designsystem.appErrorText
 import com.manhwaread.feature.browse.BrowseRoute
 import com.manhwaread.feature.details.DetailsRoute
 import com.manhwaread.feature.downloads.DownloadsRoute
@@ -49,6 +58,10 @@ private const val ARG_CHAPTER_ID = "chapterId"
 
 // Префикс маршрута читалки: на нём нижняя навигация скрыта (полный экран).
 private const val READER_ROUTE_PREFIX = "reader"
+
+// Отступы панели стриминга главы (прогресс/ошибка).
+private val StreamPanePadding = 24.dp
+private val StreamPaneSpacing = 12.dp
 
 // Корень приложения: гейт онбординга + Scaffold с нижней навигацией.
 @Composable
@@ -185,8 +198,9 @@ fun ManhwareadNavHost(
     }
 }
 
-// Обёртка читалки: офлайн-каталог главы и стартовая страница — из
-// ReaderNavViewModel (история чтения), прогресс пишется обратно в историю.
+// Обёртка читалки: скачанная глава открывается мгновенно (каталог очереди),
+// нескачанная — стримится с источника (индикатор прогресса), при сбое показывается
+// ошибка с повтором; стартовая страница — из истории, прогресс пишется обратно.
 @Composable
 private fun ReaderNavScreen(
     mangaId: Long,
@@ -198,12 +212,61 @@ private fun ReaderNavScreen(
         viewModel.open(mangaId, chapterId)
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ReaderScreen(
-        chapterDir = state.chapterDir.takeIf { state.isOpen },
-        onBack = onBack,
-        initialPageIndex = state.initialPageIndex,
-        onProgress = { pageIndex -> viewModel.onPageChanged(pageIndex) },
-    )
+    if (state.isStreaming || state.streamError != null) {
+        ReaderStreamPane(
+            state = state,
+            onRetry = viewModel::retryStream,
+            onBack = onBack,
+        )
+    } else {
+        ReaderScreen(
+            chapterDir = state.chapterDir.takeIf { state.isOpen },
+            onBack = onBack,
+            initialPageIndex = state.initialPageIndex,
+            onProgress = { pageIndex -> viewModel.onPageChanged(pageIndex) },
+        )
+    }
+}
+
+// Панель стриминга главы: прогресс загрузки страниц либо текст ошибки
+// (общий маппер appErrorText) с кнопками повтора и возврата.
+@Composable
+private fun ReaderStreamPane(
+    state: ReaderNavUiState,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.padding(StreamPanePadding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(StreamPaneSpacing),
+        ) {
+            val error = state.streamError
+            if (error != null) {
+                Text(
+                    text = appErrorText(error),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.reader_stream_retry))
+                }
+                TextButton(onClick = onBack) {
+                    Text(stringResource(R.string.reader_stream_back))
+                }
+            } else {
+                CircularProgressIndicator()
+                Text(
+                    text = stringResource(R.string.reader_streaming_progress, state.streamDone, state.streamTotal),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
 }
 
 // Переключение таба по стандартному паттерну Material: singleTop, сохранение

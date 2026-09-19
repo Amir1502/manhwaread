@@ -1,13 +1,22 @@
 package com.manhwaread.feature.details
 
 import com.manhwaread.core.common.AppError
+import com.manhwaread.core.common.DomainResult
 import com.manhwaread.core.database.ChapterDao
 import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.DownloadTaskDao
 import com.manhwaread.core.database.DownloadTaskEntity
 import com.manhwaread.core.database.MangaDao
 import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.datastore.ApiKeyStore
+import com.manhwaread.core.datastore.SettingsStore
+import com.manhwaread.core.datastore.TranslationSettings
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.translation.TranslationProvider
+import com.manhwaread.core.translation.TranslationProviderFactory
+import com.manhwaread.core.translation.TranslationRequest
+import com.manhwaread.core.translation.TranslationResponse
+import com.manhwaread.core.vision.DetectedLang
 import com.manhwaread.source.api.Filter
 import com.manhwaread.source.api.InMemorySourceRegistry
 import com.manhwaread.source.api.MangaStatus
@@ -17,6 +26,8 @@ import com.manhwaread.source.api.SChapter
 import com.manhwaread.source.api.SManga
 import com.manhwaread.source.api.Source
 import com.manhwaread.source.api.SourceException
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +52,8 @@ class DetailsViewModelTest {
     @BeforeEach
     fun setMainDispatcher() {
         Dispatchers.setMain(StandardTestDispatcher())
+        // По умолчанию провайдер не выбран: перевод тайтла в тестах не вызывается.
+        every { providerFactory.create(any()) } answers { titleProvider }
     }
 
     @AfterEach
@@ -86,6 +99,10 @@ class DetailsViewModelTest {
                     addedAtMs = if (inLibrary) nowMs else current.addedAtMs,
                 )
             }
+        }
+
+        override suspend fun setTitleRu(id: Long, titleRu: String?) {
+            rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
         }
 
         override suspend fun deleteById(id: Long) {
@@ -201,6 +218,10 @@ class DetailsViewModelTest {
         override suspend fun deleteByStatus(status: DownloadStatus) {
             tasks.removeAll { it.status == status }
         }
+
+        override suspend fun deleteForChapter(chapterId: Long) {
+            tasks.removeAll { it.chapterId == chapterId }
+        }
     }
 
     private class FakeSource(
@@ -255,12 +276,72 @@ class DetailsViewModelTest {
     private fun viewModelWith(source: Source?): DetailsViewModel {
         val registry = InMemorySourceRegistry()
         source?.let { registry.register(it) }
-        return DetailsViewModel(registry, mangaDao, chapterDao, downloadTaskDao)
+        return DetailsViewModel(
+            registry,
+            mangaDao,
+            chapterDao,
+            downloadTaskDao,
+            providerFactory,
+            settingsStore,
+            apiKeyStore,
+        )
     }
 
     private val mangaDao = FakeMangaDao()
     private val chapterDao = FakeChapterDao()
     private val downloadTaskDao = FakeDownloadTaskDao()
+    private val providerFactory = mockk<TranslationProviderFactory>()
+    private val settingsStore = FakeSettingsStore()
+    private val apiKeyStore = FakeApiKeyStore()
+    private var titleProvider: TranslationProvider? = null
+
+    // Настройки перевода: по умолчанию провайдер не выбран.
+    private class FakeSettingsStore : SettingsStore {
+        val settingsFlow = MutableStateFlow(TranslationSettings())
+        override val translationSettings: Flow<TranslationSettings> = settingsFlow
+        override suspend fun updateTranslation(settings: TranslationSettings) {
+            settingsFlow.value = settings
+        }
+
+        override val onboardingCompleted: Flow<Boolean> = MutableStateFlow(true)
+        override suspend fun setOnboardingCompleted(completed: Boolean) = Unit
+    }
+
+    private class FakeApiKeyStore : ApiKeyStore {
+        override fun saveApiKey(providerId: String, apiKey: String) = Unit
+        override fun apiKey(providerId: String): String? = "test-key"
+        override fun clearApiKey(providerId: String) = Unit
+    }
+
+    // Провайдер-заглушка: отдаёт валидный ответ LLM с русским тайтлом.
+    private class FakeTitleProvider(private val translated: String) : TranslationProvider {
+        override val id: String = "fake-title"
+        override val displayName: String = "Fake Title"
+        override fun supports(sourceLang: DetectedLang, targetLang: String): Boolean = true
+        override suspend fun translate(request: TranslationRequest): DomainResult<TranslationResponse> =
+            DomainResult.success(TranslationResponse("""[{"id":"title","text":"$translated"}]"""))
+    }
+
+    @Test
+    fun `title translated and persisted when provider selected`() = runTest {
+        settingsStore.settingsFlow.value = TranslationSettings(providerId = "fake-title")
+        titleProvider = FakeTitleProvider("Одиночное восхождение")
+        val source = FakeSource(id = 1L, details = detailsManga)
+        val viewModel = viewModelWith(source)
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+        assertEquals("Одиночное восхождение", mangaDao.rows.values.single().titleRu)
+        assertEquals("Одиночное восхождение", viewModel.uiState.value.manga?.titleRu)
+    }
+
+    @Test
+    fun `title not translated when provider not selected`() = runTest {
+        val source = FakeSource(id = 1L, details = detailsManga)
+        val viewModel = viewModelWith(source)
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+        assertNull(mangaDao.rows.values.single().titleRu)
+    }
 
     @Test
     fun `open by source url loads details and chapters`() = runTest {
@@ -354,7 +435,7 @@ class DetailsViewModelTest {
     }
 
     @Test
-    fun `chapter click enqueues pending download task`() = runTest {
+    fun `chapter click opens reader without enqueuing download`() = runTest {
         val source = FakeSource(
             id = 1L,
             details = detailsManga,
@@ -366,14 +447,13 @@ class DetailsViewModelTest {
         val chapter = viewModel.uiState.value.chapters.first()
         viewModel.onChapterClick(chapter)
         advanceUntilIdle()
-        assertEquals(1, downloadTaskDao.tasks.size)
-        val task = downloadTaskDao.tasks[0]
-        assertEquals(chapter.id, task.chapterId)
-        assertEquals(chapter.mangaId, task.mangaId)
-        assertEquals(DownloadStatus.PENDING, task.status)
-        assertEquals(0f, task.progress)
-        assertTrue(task.enqueuedAtMs > 0L)
-        assertEquals(DetailsMessage.AddedToDownloads("Chapter 5"), viewModel.uiState.value.message)
+        // Читалка открывается сразу, задача скачивания НЕ создаётся:
+        // нескачанная глава стримится с источника на уровне приложения.
+        assertTrue(downloadTaskDao.tasks.isEmpty())
+        assertEquals(
+            DetailsMessage.OpenReader(mangaId = chapter.mangaId, chapterId = chapter.id),
+            viewModel.uiState.value.message,
+        )
     }
 
     @Test
@@ -407,7 +487,30 @@ class DetailsViewModelTest {
     }
 
     @Test
-    fun `chapter click re-enqueues when latest download failed`() = runTest {
+    fun `download click enqueues pending task`() = runTest {
+        val source = FakeSource(
+            id = 1L,
+            details = detailsManga,
+            chapters = listOf(SChapter(url = "/manga/solo/chapter-5", name = "Chapter 5")),
+        )
+        val viewModel = viewModelWith(source)
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+        val chapter = viewModel.uiState.value.chapters.first()
+        viewModel.onChapterDownloadClick(chapter)
+        advanceUntilIdle()
+        assertEquals(1, downloadTaskDao.tasks.size)
+        val task = downloadTaskDao.tasks[0]
+        assertEquals(chapter.id, task.chapterId)
+        assertEquals(chapter.mangaId, task.mangaId)
+        assertEquals(DownloadStatus.PENDING, task.status)
+        assertEquals(0f, task.progress)
+        assertTrue(task.enqueuedAtMs > 0L)
+        assertEquals(DetailsMessage.AddedToDownloads("Chapter 5"), viewModel.uiState.value.message)
+    }
+
+    @Test
+    fun `download click re-enqueues when latest download failed`() = runTest {
         val source = FakeSource(
             id = 1L,
             details = detailsManga,
@@ -426,7 +529,7 @@ class DetailsViewModelTest {
                 enqueuedAtMs = 5L,
             ),
         )
-        viewModel.onChapterClick(chapter)
+        viewModel.onChapterDownloadClick(chapter)
         advanceUntilIdle()
         assertEquals(2, downloadTaskDao.tasks.size)
         assertEquals(DownloadStatus.PENDING, downloadTaskDao.tasks[1].status)

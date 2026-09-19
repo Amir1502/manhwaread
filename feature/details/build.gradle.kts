@@ -53,6 +53,10 @@ dependencies {
     implementation(project(":core:model"))
     // Тема и общий маппер ошибок appErrorText.
     implementation(project(":core:designsystem"))
+    // Перевод тайтла: TitleTranslator и фабрика провайдеров.
+    implementation(project(":core:translation-api"))
+    // Настройки перевода и хранилище API-ключей.
+    implementation(project(":core:datastore"))
     // Обложка тайтла.
     implementation(libs.coil.compose)
 
