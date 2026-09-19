@@ -7,6 +7,8 @@ import com.manhwaread.feature.downloads.selfcheck.SelfCheckResult
 // Строка очереди скачивания глав.
 data class DownloadTaskRow(
     val taskId: Long,
+    // Идентификатор главы: удаление скачанной главы чистит файлы и строки БД по нему.
+    val chapterId: Long,
     val mangaTitle: String,
     val chapterName: String,
     val status: DownloadStatus,
@@ -36,6 +38,7 @@ data class DownloadsUiState(
 data class DownloadsActions(
     val onCancelTask: (Long) -> Unit,
     val onCancelJob: (String) -> Unit,
+    val onDeleteChapter: (Long) -> Unit,
     val onRunSelfCheck: () -> Unit,
     val onSelfCheckShown: () -> Unit,
 )

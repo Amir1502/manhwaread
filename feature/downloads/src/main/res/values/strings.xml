@@ -5,6 +5,10 @@
     <string name="downloads_jobs_header">Translation queue</string>
     <string name="downloads_empty">The queue is empty</string>
     <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_delete">Delete</string>
+    <string name="downloads_delete_confirm_title">Delete downloaded chapter?</string>
+    <string name="downloads_delete_confirm_message">Downloaded files and translation data will be removed.</string>
+    <string name="downloads_delete_confirm">Delete</string>
     <string name="downloads_attempts">Attempts: %1$d</string>
     <string name="downloads_status_pending">Waiting</string>
     <string name="downloads_status_running">Downloading</string>

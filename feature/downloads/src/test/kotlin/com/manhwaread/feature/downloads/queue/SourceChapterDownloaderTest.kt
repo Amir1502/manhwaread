@@ -15,6 +15,7 @@ import okio.Buffer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -34,6 +35,8 @@ class SourceChapterDownloaderTest {
 
     private val pageBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE1.toByte(), 7, 7)
 
+    private val htmlBytes = "<html><body>Anti-bot check</body></html>".toByteArray(Charsets.UTF_8)
+
     @BeforeEach
     fun startServer() {
         server = MockWebServer()
@@ -41,7 +44,7 @@ class SourceChapterDownloaderTest {
         source = FakePageSource(baseUrl = server.url("/").toString())
         val registry = InMemorySourceRegistry()
         registry.register(source)
-        downloader = SourceChapterDownloader(registry, client, pageStore)
+        downloader = SourceChapterDownloader(registry, client, pageStore, imageValidator = ::fakeImageValidator)
     }
 
     @AfterEach
@@ -68,7 +71,8 @@ class SourceChapterDownloaderTest {
 
     @Test
     fun `cached page skips network`() = runBlocking {
-        val cached = byteArrayOf(1, 2, 3)
+        // Валидный растр в кэше (настоящий PNG): страница повторно не скачивается.
+        val cached = onePixelPngBytes
         pageStore.savePage(10L, 0, cached)
         source.pages = listOf(Page(0, server.url("/p0.png").toString()), Page(1, server.url("/p1.png").toString()))
         enqueuePage()
@@ -76,6 +80,28 @@ class SourceChapterDownloaderTest {
         assertEquals(2, refs?.size)
         assertEquals(1, server.requestCount)
         assertArrayEquals(cached, pageStore.loadPage(10L, 0))
+    }
+
+    @Test
+    fun `corrupt cached page is redownloaded`() = runBlocking {
+        // Битый кэш (HTML вместо растра) считается отсутствующей страницей.
+        pageStore.savePage(10L, 0, htmlBytes)
+        source.pages = listOf(Page(0, server.url("/p0.png").toString()))
+        server.enqueue(MockResponse().setBody(Buffer().write(onePixelPngBytes)))
+        val refs = downloader.download(job).getOrNull()
+        assertEquals(listOf(0), refs?.map { ref -> ref.index })
+        assertEquals(1, server.requestCount)
+        assertArrayEquals(onePixelPngBytes, pageStore.loadPage(10L, 0))
+    }
+
+    @Test
+    fun `html body with 200 is rejected as page`() = runBlocking {
+        // Антибот-страница с кодом 200: загрузка падает, мусор в кэш не пишется.
+        source.pages = listOf(Page(0, server.url("/p0.png").toString()))
+        server.enqueue(MockResponse().setBody(Buffer().write(htmlBytes)))
+        val error = downloader.download(job).errorOrNull()
+        assertTrue(error is AppError.Network, "expected Network, got $error")
+        assertNull(pageStore.loadPage(10L, 0))
     }
 
     @Test
@@ -123,7 +149,13 @@ class SourceChapterDownloaderTest {
         enqueuePage()
         val registry = InMemorySourceRegistry()
         registry.register(source)
-        val cancellable = SourceChapterDownloader(registry, client, pageStore) { _, _ -> false }
+        val cancellable = SourceChapterDownloader(
+            registry = registry,
+            client = client,
+            pageStore = pageStore,
+            onProgress = { _, _ -> false },
+            imageValidator = ::fakeImageValidator,
+        )
         assertThrows(CancellationException::class.java) {
             runBlocking { cancellable.download(job) }
         }

@@ -5,6 +5,10 @@
     <string name="downloads_jobs_header">Очередь перевода</string>
     <string name="downloads_empty">Очередь пуста</string>
     <string name="downloads_cancel">Отменить</string>
+    <string name="downloads_delete">Удалить</string>
+    <string name="downloads_delete_confirm_title">Удалить скачанную главу?</string>
+    <string name="downloads_delete_confirm_message">Скачанные файлы и данные перевода будут удалены.</string>
+    <string name="downloads_delete_confirm">Удалить</string>
     <string name="downloads_attempts">Попытки: %1$d</string>
     <string name="downloads_status_pending">Ожидает</string>
     <string name="downloads_status_running">Скачивается</string>

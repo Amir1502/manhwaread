@@ -26,6 +26,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okio.Buffer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -83,7 +84,7 @@ class QueueProcessorTest {
             settingsStore = settingsStore,
             apiKeyStore = apiKeyStore,
         )
-        processor = QueueProcessor(components, data, Dispatchers.Unconfined)
+        processor = QueueProcessor(components, data, Dispatchers.Unconfined, imageValidator = ::fakeImageValidator)
     }
 
     @AfterEach
@@ -152,6 +153,67 @@ class QueueProcessorTest {
 
         assertEquals(DownloadStatus.FAILED, taskDao.findById(taskId)?.status)
         assertFalseMeta(chapterId)
+    }
+
+    @Test
+    fun `html page body marks task failed instead of completed`() = runTest {
+        // Антибот-HTML с кодом 200 больше не сохраняется как pageN.bin: задача FAILED.
+        val (mangaId, chapterId) = seedChapter()
+        val taskId = seedTask(mangaId, chapterId)
+        source.pages = listOf(Page(0, server.url("/p0.png").toString()))
+        server.enqueue(MockResponse().setBody("<html><body>Anti-bot check</body></html>"))
+
+        processor.processNextDownloadTask()
+
+        assertEquals(DownloadStatus.FAILED, taskDao.findById(taskId)?.status)
+        assertFalseMeta(chapterId)
+    }
+
+    @Test
+    fun `valid png page completes task`() = runTest {
+        val (mangaId, chapterId) = seedChapter()
+        val taskId = seedTask(mangaId, chapterId)
+        source.pages = listOf(Page(0, server.url("/p0.png").toString()))
+        server.enqueue(MockResponse().setBody(Buffer().write(onePixelPngBytes)))
+
+        assertTrue(processor.processNextDownloadTask())
+
+        assertEquals(DownloadStatus.COMPLETED, taskDao.findById(taskId)?.status)
+        assertTrue(File(dirs.dirFor(chapterId), "page001.png").isFile)
+    }
+
+    @Test
+    fun `corrupt cached page is redownloaded and task completes`() = runTest {
+        // Следствие смерти процесса: в кэше главы лежит битый файл с валидным именем.
+        val (mangaId, chapterId) = seedChapter()
+        val taskId = seedTask(mangaId, chapterId)
+        val corrupt = File(dirs.ensureDirFor(chapterId), "page001.bin")
+        corrupt.writeText("<html>truncated</html>")
+        source.pages = listOf(Page(0, server.url("/p0.png").toString()))
+        server.enqueue(MockResponse().setBody(Buffer().write(onePixelPngBytes)))
+
+        processor.processNextDownloadTask()
+
+        assertEquals(DownloadStatus.COMPLETED, taskDao.findById(taskId)?.status)
+        assertEquals(1, server.requestCount)
+        assertFalse(corrupt.exists())
+        assertTrue(File(dirs.dirFor(chapterId), "page001.png").isFile)
+    }
+
+    @Test
+    fun `archive write failure marks task failed instead of stuck running`() = runTest {
+        // Сбой записи архива (имитация: chapter.json — каталог) не оставляет задачу в RUNNING.
+        val (mangaId, chapterId) = seedChapter()
+        val taskId = seedTask(mangaId, chapterId)
+        source.pages = listOf(Page(0, server.url("/p0.png").toString()))
+        server.enqueue(MockResponse().setBody(Buffer().write(onePixelPngBytes)))
+        File(dirs.ensureDirFor(chapterId), ChapterArchiveWriter.META_FILE_NAME).mkdirs()
+
+        processor.processNextDownloadTask()
+
+        val task = taskDao.findById(taskId)
+        assertEquals(DownloadStatus.FAILED, task?.status)
+        assertEquals(1f, task?.progress)
     }
 
     @Test

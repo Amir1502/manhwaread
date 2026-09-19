@@ -1,6 +1,7 @@
 package com.manhwaread.core.database
 
 import com.manhwaread.core.common.AppError
+import com.manhwaread.core.pipeline.ChapterRef
 import com.manhwaread.core.pipeline.JobState
 import com.manhwaread.core.pipeline.StageStatus
 import kotlinx.coroutines.runBlocking
@@ -59,5 +60,16 @@ class TranslationJobDaoTest : DaoTestBase() {
         val dao = db.translationJobDao()
         dao.update("ghost", JobState(status = StageStatus.DONE))
         assertTrue(dao.all().isEmpty())
+    }
+
+    @Test
+    fun `delete for chapter removes only its jobs`() = runBlocking {
+        val dao = db.translationJobDao()
+        // Фикстура job() использует chapterId = 100; второй задаче ставим другую главу.
+        dao.enqueue(DatabaseFixtures.job("keep-100"))
+        dao.enqueue(DatabaseFixtures.job("drop-200").copy(ref = ChapterRef(1L, 10L, 200L, "/ch/200")))
+        dao.deleteForChapter(200L)
+        assertEquals(listOf("keep-100"), dao.all().map { it.id })
+        assertNull(dao.findById("drop-200"))
     }
 }

@@ -29,6 +29,10 @@ interface TranslationJobDao : ChapterJobStore {
     @Query("SELECT * FROM translation_jobs ORDER BY priority DESC, createdAt ASC")
     fun observeAllEntities(): Flow<List<TranslationJobEntity>>
 
+    // Удаление скачанной главы (экран «Загрузки»): задачи конвейера главы больше не нужны.
+    @Query("DELETE FROM translation_jobs WHERE chapterId = :chapterId")
+    suspend fun deleteForChapter(chapterId: Long)
+
     override suspend fun enqueue(job: ChapterJob) {
         upsertEntity(job.toEntity())
     }

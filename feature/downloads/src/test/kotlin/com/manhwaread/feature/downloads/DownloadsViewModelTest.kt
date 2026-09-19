@@ -10,6 +10,9 @@ import com.manhwaread.core.database.TranslationJobDao
 import com.manhwaread.core.database.TranslationJobEntity
 import com.manhwaread.core.model.DownloadStatus
 import com.manhwaread.core.pipeline.StageStatus
+import com.manhwaread.feature.downloads.queue.ChapterDeleter
+import com.manhwaread.feature.downloads.queue.ChapterDirs
+import com.manhwaread.feature.downloads.queue.FakeQueueSegmentDao
 import com.manhwaread.feature.downloads.selfcheck.SelfCheckExecutor
 import com.manhwaread.feature.downloads.selfcheck.SelfCheckResult
 import com.manhwaread.source.api.MangaStatus
@@ -30,6 +33,8 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DownloadsViewModelTest {
@@ -84,6 +89,12 @@ class DownloadsViewModelTest {
             publish()
         }
 
+        override suspend fun deleteForChapter(chapterId: Long) {
+            val keys = rows.filterValues { it.chapterId == chapterId }.keys
+            keys.forEach { rows.remove(it) }
+            publish()
+        }
+
         private fun publish() {
             allFlow.value = rows.values.sortedBy { it.enqueuedAtMs }
         }
@@ -117,6 +128,12 @@ class DownloadsViewModelTest {
 
         override fun observeAllEntities(): Flow<List<TranslationJobEntity>> = allFlow
 
+        override suspend fun deleteForChapter(chapterId: Long) {
+            val keys = rows.filterValues { it.chapterId == chapterId }.keys
+            keys.forEach { rows.remove(it) }
+            publish()
+        }
+
         private fun publish() {
             allFlow.value = rows.values.sortedWith(
                 compareByDescending<TranslationJobEntity> { it.priority }.thenBy { it.createdAt },
@@ -146,6 +163,10 @@ class DownloadsViewModelTest {
         override suspend fun searchInLibrary(query: String): List<MangaEntity> = emptyList()
 
         override suspend fun setInLibrary(id: Long, inLibrary: Boolean, nowMs: Long) = Unit
+
+        override suspend fun setTitleRu(id: Long, titleRu: String?) {
+            rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
+        }
 
         override suspend fun deleteById(id: Long) {
             rows.remove(id)
@@ -201,11 +222,15 @@ class DownloadsViewModelTest {
         }
     }
 
+    @TempDir
+    lateinit var tempDir: File
+
     private val taskDao = FakeDownloadTaskDao()
     private val jobDao = FakeTranslationJobDao()
     private val mangaDao = FakeMangaDao()
     private val chapterDao = FakeChapterDao()
     private val selfCheckExecutor = FakeSelfCheckExecutor()
+    private val segmentDao = FakeQueueSegmentDao()
 
     private fun seedTitles() {
         mangaDao.rows[1L] = MangaEntity(
@@ -250,8 +275,15 @@ class DownloadsViewModelTest {
         lastError = lastError,
     )
 
-    private fun viewModel(): DownloadsViewModel =
-        DownloadsViewModel(taskDao, jobDao, mangaDao, chapterDao, selfCheckExecutor)
+    private fun viewModel(): DownloadsViewModel = DownloadsViewModel(
+        downloadTaskDao = taskDao,
+        translationJobDao = jobDao,
+        mangaDao = mangaDao,
+        chapterDao = chapterDao,
+        selfCheckExecutor = selfCheckExecutor,
+        // Настоящий ChapterDeleter на фейковых DAO: проверка сквозного удаления.
+        chapterDeleter = ChapterDeleter(ChapterDirs(tempDir), taskDao, jobDao, segmentDao, Dispatchers.Unconfined),
+    )
 
     @Test
     fun `init maps tasks and jobs with titles`() = runTest {
@@ -266,6 +298,7 @@ class DownloadsViewModelTest {
         assertFalse(state.isLoading)
         assertEquals(1, state.tasks.size)
         val task = state.tasks[0]
+        assertEquals(10L, task.chapterId)
         assertEquals("Solo Leveling", task.mangaTitle)
         assertEquals("Chapter 5", task.chapterName)
         assertEquals(DownloadStatus.RUNNING, task.status)
@@ -339,6 +372,33 @@ class DownloadsViewModelTest {
         advanceUntilIdle()
         assertTrue(taskDao.rows.isEmpty())
         assertTrue(jobDao.rows.isEmpty())
+    }
+
+    @Test
+    fun `delete chapter removes files and rows of that chapter only`() = runTest {
+        seedTitles()
+        val chapterDir = File(tempDir, "chapter_10").apply { mkdirs() }
+        File(chapterDir, "page001.png").writeBytes(byteArrayOf(1))
+        taskDao.seed(
+            DownloadTaskEntity(mangaId = 1L, chapterId = 10L, status = DownloadStatus.COMPLETED, progress = 1f, enqueuedAtMs = 1L),
+        )
+        val otherTask = taskDao.seed(
+            DownloadTaskEntity(mangaId = 1L, chapterId = 20L, status = DownloadStatus.PENDING, enqueuedAtMs = 2L),
+        )
+        jobDao.seed(job())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.onDeleteChapter(10L)
+        advanceUntilIdle()
+
+        // Каталог главы удалён, строки БД главы 10 исчезли, глава 20 не тронута.
+        assertFalse(chapterDir.exists())
+        assertEquals(listOf(otherTask.id), taskDao.rows.values.map { it.id })
+        assertTrue(jobDao.rows.isEmpty())
+        // Состояние экрана переопубликовано потоками DAO.
+        assertEquals(listOf(20L), viewModel.uiState.value.tasks.map { it.chapterId })
+        assertTrue(viewModel.uiState.value.jobs.isEmpty())
     }
 
     @Test

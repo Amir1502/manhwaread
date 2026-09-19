@@ -8,6 +8,8 @@ import com.manhwaread.core.database.DownloadTaskDao
 import com.manhwaread.core.database.DownloadTaskEntity
 import com.manhwaread.core.database.MangaDao
 import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.database.SegmentDao
+import com.manhwaread.core.database.SegmentEntity
 import com.manhwaread.core.database.TranslationJobDao
 import com.manhwaread.core.database.TranslationJobEntity
 import com.manhwaread.core.datastore.ApiKeyStore
@@ -32,8 +34,25 @@ import com.manhwaread.source.api.SourceException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.util.Base64
 
 // Общие фейки unit-тестов очереди (ФАЗА 15): DAO, настройки, источник, стадии.
+
+// Настоящий 1×1 PNG: декодируемый растр для тестов целостности загрузок.
+internal val onePixelPngBytes: ByteArray = Base64.getDecoder().decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+)
+
+// Фейк валидации растра для JVM-тестов: настоящая проверка через BitmapFactory
+// требует Android-среды (Robolectric), здесь достаточно магических байтов PNG/JPEG.
+internal fun fakeImageValidator(bytes: ByteArray): Boolean =
+    hasPrefix(bytes, PNG_MAGIC_BYTES) || hasPrefix(bytes, JPEG_MAGIC_BYTES)
+
+private fun hasPrefix(bytes: ByteArray, prefix: ByteArray): Boolean =
+    bytes.size >= prefix.size && prefix.indices.all { index -> bytes[index] == prefix[index] }
+
+private val PNG_MAGIC_BYTES = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)
+private val JPEG_MAGIC_BYTES = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())
 
 internal class FakePageSource(
     override val id: Long = 7L,
@@ -116,6 +135,11 @@ internal class FakeDownloadTaskDao : DownloadTaskDao {
         publish()
     }
 
+    override suspend fun deleteForChapter(chapterId: Long) {
+        tasks.removeAll { it.chapterId == chapterId }
+        publish()
+    }
+
     private fun replace(entity: DownloadTaskEntity) {
         val index = tasks.indexOfFirst { it.id == entity.id }
         if (index >= 0) tasks[index] = entity else tasks += entity
@@ -151,6 +175,10 @@ internal class FakeQueueMangaDao : MangaDao {
 
     override suspend fun setInLibrary(id: Long, inLibrary: Boolean, nowMs: Long) {
         mangas[id]?.let { manga -> mangas[id] = manga.copy(inLibrary = inLibrary, addedAtMs = nowMs) }
+    }
+
+    override suspend fun setTitleRu(id: Long, titleRu: String?) {
+        mangas[id]?.let { manga -> mangas[id] = manga.copy(titleRu = titleRu) }
     }
 
     override suspend fun deleteById(id: Long) {
@@ -221,8 +249,39 @@ internal class FakeQueueJobDao : TranslationJobDao {
 
     override fun observeAllEntities(): Flow<List<TranslationJobEntity>> = MutableStateFlow(sortedEntities())
 
+    override suspend fun deleteForChapter(chapterId: Long) {
+        entities.entries.removeAll { entry -> entry.value.chapterId == chapterId }
+    }
+
     private fun sortedEntities(): List<TranslationJobEntity> =
         entities.values.sortedWith(compareByDescending<TranslationJobEntity> { it.priority }.thenBy { it.createdAt })
+}
+
+internal class FakeQueueSegmentDao : SegmentDao {
+    val segments = mutableListOf<SegmentEntity>()
+    val deletedChapters = mutableListOf<Long>()
+
+    override suspend fun insertAll(segments: List<SegmentEntity>) {
+        this.segments += segments
+    }
+
+    override suspend fun deleteForChapter(chapterId: Long) {
+        deletedChapters += chapterId
+        segments.removeAll { it.chapterId == chapterId }
+    }
+
+    override fun observeForChapter(chapterId: Long): Flow<List<SegmentEntity>> =
+        MutableStateFlow(segments.filter { it.chapterId == chapterId })
+
+    override suspend fun allForChapter(chapterId: Long): List<SegmentEntity> =
+        segments.filter { it.chapterId == chapterId }
+
+    override suspend fun updateTranslation(id: String, text: String, editedByUser: Boolean) {
+        val index = segments.indexOfFirst { it.id == id }
+        if (index >= 0) {
+            segments[index] = segments[index].copy(translatedText = text, isEditedByUser = editedByUser, needsRetry = false)
+        }
+    }
 }
 
 internal class FakeQueueSettingsStore(initial: TranslationSettings = TranslationSettings()) : SettingsStore {

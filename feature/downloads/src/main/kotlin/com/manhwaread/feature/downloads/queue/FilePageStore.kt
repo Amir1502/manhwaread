@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 
 // Дисковое хранилище страниц (ФАЗА 15): файлы каталога главы — офлайн-кэш,
@@ -18,9 +19,19 @@ class FilePageStore(
     override suspend fun savePage(chapterId: Long, pageIndex: Int, bytes: ByteArray): Unit =
         withContext(ioDispatcher) {
             val dir = chapterDirs.ensureDirFor(chapterId)
-            // Повторная загрузка страницы заменяет файл: удаляем старые расширения.
+            val target = File(dir, "${pageName(pageIndex)}.${extensionFor(bytes)}")
+            // Атомарная запись: сначала временный файл, затем rename. Смерть процесса
+            // посреди записи больше не оставляет усечённую страницу в кэше главы.
+            val tmp = File(dir, "${target.name}$TMP_SUFFIX")
+            tmp.writeBytes(bytes)
+            // Повторная загрузка страницы заменяет файл: удаляем старые расширения
+            // и временный мусор прежних прогонов (rename в Windows не перезаписывает цель).
             pageFiles(dir, pageIndex).forEach { file -> file.delete() }
-            File(dir, "${pageName(pageIndex)}.${extensionFor(bytes)}").writeBytes(bytes)
+            tmpFiles(dir, pageIndex).filter { file -> file != tmp }.forEach { file -> file.delete() }
+            if (!tmp.renameTo(target)) {
+                tmp.delete()
+                throw IOException("page $pageIndex of chapter $chapterId: rename to ${target.name} failed")
+            }
         }
 
     override suspend fun loadPage(chapterId: Long, pageIndex: Int): ByteArray? =
@@ -35,6 +46,16 @@ class FilePageStore(
             ?.toList()
             .orEmpty()
             .sortedBy { file -> file.name }
+    }
+
+    // Временные файлы записи («page001.png.tmp»): pageFiles их не видит
+    // (nameWithoutExtension — «page001.png»), поэтому чистятся отдельно.
+    private fun tmpFiles(dir: File, pageIndex: Int): List<File> {
+        if (!dir.isDirectory) return emptyList()
+        val prefix = "${pageName(pageIndex)}."
+        return dir.listFiles { file -> file.isFile && file.name.startsWith(prefix) && file.name.endsWith(TMP_SUFFIX) }
+            ?.toList()
+            .orEmpty()
     }
 
     // page001 — нумерация с 1 и три цифры: FileChapterLoader сортирует по числу в имени.
@@ -61,6 +82,7 @@ class FilePageStore(
     }
 
     private companion object {
+        const val TMP_SUFFIX = ".tmp"
         val PNG_MAGIC = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)
         val JPEG_MAGIC = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())
         val RIFF_MAGIC = "RIFF".toByteArray(Charsets.US_ASCII)

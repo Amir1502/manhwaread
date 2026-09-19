@@ -13,6 +13,7 @@ import com.manhwaread.core.database.TranslationJobEntity
 import com.manhwaread.core.model.DownloadStatus
 import com.manhwaread.core.pipeline.JobState
 import com.manhwaread.core.pipeline.StageStatus
+import com.manhwaread.feature.downloads.queue.ChapterDeleter
 import com.manhwaread.feature.downloads.selfcheck.SelfCheckExecutor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,7 @@ class DownloadsViewModel @Inject constructor(
     private val mangaDao: MangaDao,
     private val chapterDao: ChapterDao,
     private val selfCheckExecutor: SelfCheckExecutor,
+    private val chapterDeleter: ChapterDeleter,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DownloadsUiState())
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
@@ -86,6 +88,14 @@ class DownloadsViewModel @Inject constructor(
         }
     }
 
+    // Удаление скачанной главы: файлы на диске и связанные строки БД.
+    // Ряд исчезает с экрана сам — потоки DAO переопубликуют очереди.
+    fun onDeleteChapter(chapterId: Long) {
+        viewModelScope.launch {
+            chapterDeleter.delete(chapterId)
+        }
+    }
+
     // Запуск офлайн-самопроверки конвейера; повторный запуск во время прогона игнорируется.
     fun onRunSelfCheck() {
         if (_uiState.value.isSelfCheckRunning) return
@@ -103,6 +113,7 @@ class DownloadsViewModel @Inject constructor(
 
     private suspend fun toTaskRow(task: DownloadTaskEntity): DownloadTaskRow = DownloadTaskRow(
         taskId = task.id,
+        chapterId = task.chapterId,
         mangaTitle = titleFor(task.mangaId),
         chapterName = chapterNameFor(task.chapterId),
         status = task.status,

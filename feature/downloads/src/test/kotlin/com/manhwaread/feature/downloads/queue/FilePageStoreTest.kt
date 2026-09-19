@@ -1,14 +1,17 @@
 package com.manhwaread.feature.downloads.queue
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.IOException
 
 class FilePageStoreTest {
     @TempDir
@@ -64,5 +67,38 @@ class FilePageStoreTest {
         val names = dirs.dirFor(10L).listFiles()?.map { file -> file.name }.orEmpty()
         assertEquals(listOf("page001.png"), names)
         assertArrayEquals(pngBytes, store().loadPage(10L, 0))
+    }
+
+    @Test
+    fun `save leaves no tmp files behind`() = runTest {
+        // Атомарная запись: после savePage в каталоге только целевой файл.
+        store().savePage(chapterId = 10L, pageIndex = 0, bytes = pngBytes)
+        val names = dirs.dirFor(10L).listFiles()?.map { file -> file.name }.orEmpty()
+        assertEquals(listOf("page001.png"), names)
+    }
+
+    @Test
+    fun `stale tmp from crashed write is invisible and cleaned`() = runTest {
+        // Имитация смерти процесса: остался недописанный временный файл.
+        val dir = dirs.ensureDirFor(10L)
+        File(dir, "page001.png.tmp").writeText("garbage")
+        assertNull(store().loadPage(10L, 0))
+
+        store().savePage(chapterId = 10L, pageIndex = 0, bytes = pngBytes)
+
+        assertArrayEquals(pngBytes, store().loadPage(10L, 0))
+        assertEquals(listOf("page001.png"), dir.listFiles()?.map { file -> file.name }.orEmpty())
+    }
+
+    @Test
+    fun `save fails when rename target cannot be replaced`() {
+        // Цель занята каталогом: rename гарантированно неудачен на любой ОС —
+        // savePage сообщает об ошибке вместо молчаливой потери страницы.
+        val dir = dirs.ensureDirFor(10L)
+        File(dir, "page001.png").mkdirs()
+        assertThrows(IOException::class.java) {
+            runBlocking { store().savePage(chapterId = 10L, pageIndex = 0, bytes = pngBytes) }
+        }
+        assertTrue(File(dir, "page001.png").isDirectory)
     }
 }

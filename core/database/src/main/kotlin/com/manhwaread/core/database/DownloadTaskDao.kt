@@ -31,4 +31,8 @@ interface DownloadTaskDao {
 
     @Query("DELETE FROM download_tasks WHERE status = :status")
     suspend fun deleteByStatus(status: DownloadStatus)
+
+    // Удаление скачанной главы (экран «Загрузки»): чистим всю историю задач главы.
+    @Query("DELETE FROM download_tasks WHERE chapterId = :chapterId")
+    suspend fun deleteForChapter(chapterId: Long)
 }

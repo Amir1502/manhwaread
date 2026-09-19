@@ -39,6 +39,8 @@ class QueueProcessor(
     private val components: QueueComponents,
     private val data: QueueData,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    // Прод-валидатор растров страниц — BitmapFactory; JVM-тесты подставляют фейк.
+    private val imageValidator: (ByteArray) -> Boolean = ::isDecodableImage,
 ) {
     // Прикладной scope очереди: живёт столько же, сколько процесс.
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
@@ -91,13 +93,32 @@ class QueueProcessor(
             val progress = data.taskDao.findById(task.id)?.progress ?: 0f
             data.taskDao.updateProgress(task.id, DownloadStatus.FAILED, progress)
         } else if (refs != null) {
-            components.archiveWriter.writeDownloadedChapter(chapter.id, chapter.name)
-            data.taskDao.updateProgress(task.id, DownloadStatus.COMPLETED, 1f)
-            enqueueTranslationIfConfigured(manga, chapter)
+            // Запись архива внутри обработки ошибок: сбой (например, нет места)
+            // больше не оставляет задачу висеть в RUNNING до перезапуска приложения.
+            val archiveError = writeDownloadedArchive(chapter)
+            if (archiveError == null) {
+                data.taskDao.updateProgress(task.id, DownloadStatus.COMPLETED, 1f)
+                enqueueTranslationIfConfigured(manga, chapter)
+            } else {
+                val progress = data.taskDao.findById(task.id)?.progress ?: 0f
+                data.taskDao.updateProgress(task.id, DownloadStatus.FAILED, progress)
+            }
         }
         // outcome == null — задача отменена из UI во время загрузки: статус уже CANCELLED.
         return true
     }
+
+    // Обёртка записи офлайн-архива: null — успех, иначе ошибка для статуса FAILED.
+    // CancellationException пробрасывается: отмена scope не является сбоем записи.
+    private suspend fun writeDownloadedArchive(chapter: ChapterEntity): Throwable? =
+        try {
+            components.archiveWriter.writeDownloadedChapter(chapter.id, chapter.name)
+            null
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (expected: Exception) {
+            expected
+        }
 
     private suspend fun executeDownload(
         taskId: Long,
@@ -122,6 +143,7 @@ class QueueProcessor(
         client = components.httpClient,
         pageStore = components.pageStore,
         onProgress = { done, total -> reportTaskProgress(taskId, done, total) },
+        imageValidator = imageValidator,
     )
 
     // Прогресс задачи + проверка отмены: false останавливает загрузчик.
@@ -177,7 +199,12 @@ class QueueProcessor(
     // Перевод записывается обратно в SegmentStore декоратором: писатель архива
     // берёт для карточки бабла цельный текст сегментов, а не строки оверлея.
     private fun pipelineStages(provider: TranslationProvider, chapterId: Long) = PipelineStages(
-        downloader = SourceChapterDownloader(components.registry, components.httpClient, components.pageStore),
+        downloader = SourceChapterDownloader(
+            registry = components.registry,
+            client = components.httpClient,
+            pageStore = components.pageStore,
+            imageValidator = imageValidator,
+        ),
         analyzer = SegmentPersistingAnalyzer(components.analyzer, components.segmentStore),
         translator = SegmentPersistingTranslator(ProviderSegmentTranslator(provider), components.segmentStore, chapterId),
         compositor = components.compositor,
