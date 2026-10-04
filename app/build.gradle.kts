@@ -108,6 +108,7 @@ dependencies {
     implementation(project(":source:mangadex"))
     implementation(project(":source:madara"))
     implementation(project(":source:asura"))
+    implementation(project(":source:mangamir"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

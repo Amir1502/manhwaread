@@ -28,6 +28,7 @@ include(":source:api")
 include(":source:mangadex")
 include(":source:madara")
 include(":source:asura")
+include(":source:mangamir")
 
 // Android-модули
 include(":core:database")

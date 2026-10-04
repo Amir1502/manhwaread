@@ -1,0 +1,60 @@
+# Manhwaread — Session Progress & Context Tracking
+
+## 1. Архитектурный контекст
+- Текущая версия: ⚠️ не подтверждена — сверить `versionName` / `versionCode` в `app/build.gradle.kts` (пример из ТЗ: 0.1.5, versionCode 6). После этапа 9: следующий minor и `versionCode + 1`.
+- Активные модули: `:core:*` (в т. ч. `:core:designsystem`), `:source:api`, `:source:*`, `:source:mangamir` (новый, JVM), `:feature:browse`, `:feature:library`, `:feature:details`, `:feature:reader`, `:app`.
+- Закреплённые контракты: `OverlaySpec`, `StageMachine`, Source API (`:source:api:Source`). Правило: только аддитивные изменения (nullable / значения по умолчанию), без переименований и смены сигнатур; всё остальное — через Opus.
+- MangaMir: `MANGAMIR_SOURCE_ID = 4001L`, `lang = "ru"`, `baseUrl = "https://mangamir.com"`; сайт — Laravel + Livewire + Alpine, SSR-HTML, JSON-LD `@graph`.
+- Протокол: Opus — план, контракты, DoD, ревью; Gemini — реализация этапа (полные файлы или неразрывный дифф, без `TODO`, `// ...`, `NotImplementedError`).
+
+## 2. Что сделано (Completed & Verified)
+- [x] Разведка MangaMir: эндпоинты, параметры, JSON-LD/DOM, ловушки — curl, 2026-10-04 (`curl -sL 'https://mangamir.com/manga?sort=last_chapter_id&dir=desc'`, `curl -sL 'https://mangamir.com/manga/korol-mecha?toc'`).
+- [x] Фикстуры из реальных ответов: `source/mangamir/src/test/resources/mangamir/` (7 HTML + README с ожидаемыми значениями) — проверено скриптом: карточек 3 / 3 / 1 / 0, глав 6 + 1 «Прогноз», страниц 3, похожих тайтлов 3.
+- [x] План декомпозиции: 9 этапов с Blast Radius, контрактами и DoD (страница «manhwaread» в Notion).
+- [x] Спеки этапов 2–4 (очередь, ошибки AI, читалка, данные) — субагент-архитектор, сверено с официальной документацией Android / Gemini / OpenAI / Anthropic.
+- [x] Этап 1 — `:source:mangamir`. Реализован полный JVM-модуль источника MangaMir (`MangaMirSource`, `MangaMirParser`, `MangaMirJsonLd`, `MangaMirUrls`), зарегистрирован в `SourceModule.kt` и `settings.gradle.kts`. Проверено: `./gradlew :source:mangamir:ktlintCheck :source:mangamir:detekt :source:mangamir:test` (18 из 18 тестов прошли, detekt и ktlint без ошибок).
+
+## 3. В процессе (In Progress)
+- [ ] Ожидание ревью этапа 1 / переход к этапу 2 (надёжность конвейера очереди и воркеров).
+
+## 4. Что предстоит сделать (Backlog)
+- [ ] P1 · Этап 2 — надёжность конвейера: lease + recovery очереди, очистка `cacheDir`, типизированные ошибки AI (401 / 429) → snackbar «Настройки».
+- [ ] P1 · Этап 3 — движок читалки: `TiledImageView` (pinch-zoom), безопасный `BitmapRegionDecoder`.
+- [ ] P2 · Этап 4 — контракты и данные: аддитивные поля Source API, `ReadingStatus`, прогресс чтения, миграции Room + тесты.
+- [ ] P2 · Этап 5 — `:core:designsystem`: токены Mangalib, формы, типографика, базовые компоненты, конфиг detekt / ktlint для Compose.
+- [ ] P2 · Этап 6 — `:feature:browse` + `:feature:library`: карточки 3:4 с бейджами, табы статусов.
+- [ ] P3 · Этап 7 — `:feature:details`: blur-шапка, «Продолжить чтение», вкладки «О тайтле» / «Главы».
+- [ ] P3 · Этап 8 — `:feature:reader`: плавающие панели, слайдер, режимы, AI-тумблер, инфо-полоса.
+- [ ] P3 · Этап 9 — финальный QA по DoD ТЗ.
+
+## 5. Выявленные баги и риски
+| Баг / Проблема | Локализация | Причина | Статус фикса |
+|---|---|---|---|
+| `?sort=updated` из ТЗ игнорируется | MangaMir `getLatest` | реальные параметры `sort` / `dir` / `q` / `page`; значения `sort`: `published_at`, `last_chapter_id`, `name`, `views`, `rating`, `subscriptions` | 📝 спека: `?sort=last_chapter_id&dir=desc` |
+| Неполный список глав | MangaMir `getChapterList` | на `/manga/{slug}` в `hasPart` ≈ 9 глав, в DOM ≈ 10; остальное догружает Livewire `showAllChapters` | 📝 спека: GET `/manga/{slug}?toc` (304 из 304) |
+| Невыпущенная глава в списке | DOM-фолбэк глав | строка «Прогноз» (`tom-7-glava-303`, без `<time>`) и кнопка «Когда выйдет …» | 📝 спека: только `li.list-row` с `time[datetime]` |
+| Номер главы ≠ slug | `ChapterNumberParser` | «Глава 300.1» ↔ `tom-7-glava-300-1`; хвосты («… Конец», «… Удар, пронзающий небеса») | 📝 спека: парсить `name` / `title` |
+| Даты глав не монотонны | порядок глав | 300.1 датирована раньше 300 | 📝 спека: порядок по `position` |
+| Страница за пределами каталога | `getPopular` / `search` | `?page=60` → HTTP 200 и 0 карточек | 📝 спека: `hasNextPage` = есть ссылка «Вперёд» |
+| Дубли ссылок в карточке | каталог | постер + заголовок + ссылка на последнюю главу | 📝 спека: только `a[data-card-link-type="poster"]` |
+| Нет автора и альт. названия | `getDetails` | отсутствуют и в JSON-LD, и в DOM | 📝 спека: `author = null`, `altTitle = null` |
+| Описание в JSON-LD обрезано | `getDetails` | `description` = первая фраза (125 из 832 символов) | 📝 спека: описание из DOM, JSON-LD — фолбэк |
+| Жанры карусели «Похожая манга» смешиваются с жанрами тайтла | DOM-фолбэк `getDetails` | у карточек карусели тоже `a[href^="/genre/"]` | 📝 спека: исключать `[x-data^="bookCarousel"]` |
+| Задачи висят в ANALYZING/TRANSLATING после kill/stop | QueueProcessor, Worker, DAO | (гипотеза) нет lease/recoverStale | 📝 спека 2a → Gemini |
+| Двойная обработка задачи | claim в DAO | (гипотеза) нет CAS и fencing, KEEP | 📝 спека 2a → Gemini |
+| Сироты temp в cacheDir | загрузчики задач | (гипотеза) cleanup без NonCancellable, нет sweep | 📝 спека 2b → Gemini |
+| Тихое падение на 401/429, ключ в логах | AI-клиенты, Scaffold :app | (гипотеза) нет классификатора, канала в UI и редакции | 📝 спека 2c → Gemini |
+| Артефакты при резком pinch | TiledImageView | (гипотеза) sampleSize меняется в жесте, нет базового слоя, устаревшие тайлы | 📝 спека 3a → Gemini |
+| Краш на битых изображениях | BitmapRegionDecoder | (гипотеза) нет валидации, гонка recycle↔decode | 📝 спека 3b → Gemini |
+| Нет полей для бейджей и шапки | :source:api | нет полей в модели | 📝 спека 4.1 → Gemini |
+| Нет статусов библиотеки | Room, :feature:library | нет колонки и миграции | 📝 спека 4.2 → Gemini |
+| Неверное «Продолжить чтение» (300.1, «Конец») | ChapterNumberParser, :feature:details | (гипотеза) порядок по номеру/дате, Float | 📝 спека 4.3 → Gemini |
+| Порядок версий БД | Room (этапы 2 и 4) | обе миграции меняют одну БД | ❓ ТС: миграция этапа 2 первой |
+| Новые переходы `StageMachine` | закреплённый контракт | откат «в работе» → `QUEUED` / `FAILED` / `CANCELLED` | ❓ ТС: только аддитивно |
+| Хранение постраничного результата перевода | `OverlaySpec` | нужно для идемпотентного повтора задачи | ❓ ТС |
+| Кнопка, когда всё прочитано | `:feature:details` | в ТЗ только «Продолжить» и «Начать читать» | ❓ ТС: «Перечитать» или скрыть |
+| `Modifier.blur` игнорируется ниже API 31 | `:feature:details` | RenderEffect только с Android 12 | 📝 спека 7: фолбэк даунскейлом + скрим |
+| Крэш Slider при `pageCount ≤ 1` | `:feature:reader` | пустой `valueRange`, `steps < 0` | 📝 спека 8: guard |
+| Текущая страница вебтуна по `firstVisibleItemIndex` | `:feature:reader` | неверно для высоких страниц | 📝 спека 8: элемент под центром экрана |
+| ktlint / detekt на Compose-коде | DoD | `function-naming` для `@Composable`, `MagicNumber` для hex, `LongParameterList` | 📝 спека 5: `.editorconfig` + `detekt.yml` |
+| Контраст ниже WCAG AA | `:core:designsystem` | белый на `#FF6740` = 2.89:1; `#65656D` на `#1C1C1F` = 2.94:1 | ❓ решение владельца дизайна |

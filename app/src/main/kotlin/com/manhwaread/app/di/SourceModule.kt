@@ -10,6 +10,7 @@ import com.manhwaread.source.asura.AsuraSource
 import com.manhwaread.source.madara.MadaraSource
 import com.manhwaread.source.madara.manga18fxConfig
 import com.manhwaread.source.mangadex.MangaDexSource
+import com.manhwaread.source.mangamir.MangaMirSource
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -36,7 +37,7 @@ object SourceModule {
         ),
     )
 
-    // Подключённые источники (ФАЗА 13): MangaDex, manga18fx (Madara), Asura.
+    // Подключённые источники (ФАЗА 13 + MangaMir): MangaDex, manga18fx (Madara), Asura, MangaMir.
     @Provides
     @Singleton
     fun provideSourceRegistry(client: OkHttpClient): SourceRegistry {
@@ -44,6 +45,7 @@ object SourceModule {
         registry.register(MangaDexSource(client))
         registry.register(MadaraSource(manga18fxConfig(), client))
         registry.register(AsuraSource(client))
+        registry.register(MangaMirSource(client))
         return registry
     }
 
