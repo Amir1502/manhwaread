@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.manhwaread.core.datastore.ApiKeyStore
+import com.manhwaread.core.datastore.DataStoreReaderSettingsStore
 import com.manhwaread.core.datastore.DataStoreSettingsStore
+import com.manhwaread.core.datastore.ReaderSettingsStore
 import com.manhwaread.core.datastore.SecureApiKeyStore
 import com.manhwaread.core.datastore.SettingsStore
 import com.manhwaread.core.datastore.createEncryptedPrefs
@@ -34,6 +36,14 @@ object DatastoreModule {
     fun provideSettingsStore(
         dataStore: DataStore<Preferences>,
     ): SettingsStore = DataStoreSettingsStore(dataStore)
+
+    // Режим читалки по тайтлу живёт в том же DataStore-файле, что и настройки:
+    // второй экземпляр DataStore на один файл запрещён.
+    @Provides
+    @Singleton
+    fun provideReaderSettingsStore(
+        dataStore: DataStore<Preferences>,
+    ): ReaderSettingsStore = DataStoreReaderSettingsStore(dataStore)
 
     @Provides
     @Singleton

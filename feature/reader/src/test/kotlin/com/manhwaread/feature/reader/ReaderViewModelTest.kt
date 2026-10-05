@@ -1,5 +1,8 @@
 package com.manhwaread.feature.reader
 
+import com.manhwaread.core.vision.OverlayLine
+import com.manhwaread.core.vision.OverlaySpec
+import com.manhwaread.core.vision.PointF
 import com.manhwaread.core.vision.RectF
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -182,16 +185,148 @@ class ReaderViewModelTest {
     }
 
     @Test
-    fun `miss tap toggles chrome when sheet is closed`() = runTest {
+    fun `miss tap hides chrome and only central tap shows it again`() = runTest {
         val viewModel = viewModelReturning(chapter())
         viewModel.openedChapter()
         assertTrue(viewModel.uiState.value.chromeVisible)
-        // Тап мимо бабла (900, 2000): лист закрыт — панели скрываются.
+        // Тап мимо бабла при видимых панелях скрывает их — в любой зоне.
         viewModel.onTap(pageIndex = 0, x = 900f, y = 2000f)
         assertFalse(viewModel.uiState.value.chromeVisible)
-        // Повторный тап мимо — панели возвращаются.
+        // Тап по нижней трети ленты панели не возвращает — это шаг прокрутки.
         viewModel.onTap(pageIndex = 0, x = 900f, y = 2000f)
+        assertFalse(viewModel.uiState.value.chromeVisible)
+        // Центральная треть экрана показывает панели.
+        viewModel.onTap(pageIndex = 0, x = 540f, y = 1200f)
         assertTrue(viewModel.uiState.value.chromeVisible)
+    }
+
+    @Test
+    fun `webtoon edge taps emit unique scroll steps`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.hideChrome()
+
+        // Вторая страница сдвинута лентой: зона считается по viewportY, а не по y страницы.
+        viewModel.onTap(pageIndex = 1, x = 800f, y = 50f, viewportY = 2300f)
+        val forward = viewModel.uiState.value.scrollStep
+        assertEquals(1, forward?.direction)
+
+        viewModel.onTap(pageIndex = 1, x = 800f, y = 50f, viewportY = 100f)
+        val backward = viewModel.uiState.value.scrollStep
+        assertEquals(-1, backward?.direction)
+        assertTrue((backward?.token ?: 0L) > (forward?.token ?: 0L))
+
+        // Устаревший шаг не сбрасывает более новый запрос.
+        viewModel.consumeScrollStep(forward!!)
+        assertEquals(backward, viewModel.uiState.value.scrollStep)
+        viewModel.consumeScrollStep(backward!!)
+        assertNull(viewModel.uiState.value.scrollStep)
+        assertNull(viewModel.uiState.value.scrollTarget)
+    }
+
+    @Test
+    fun `pager edge taps turn pages and mirror in right to left`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.setMode(ReaderMode.LTR)
+        viewModel.hideChrome()
+
+        viewModel.onTap(pageIndex = 0, x = 1000f, y = 1200f)
+        assertEquals(1, viewModel.uiState.value.scrollTarget)
+        assertTrue(viewModel.uiState.value.scrollTargetAnimated)
+        viewModel.consumeScrollTarget()
+
+        // Первая страница: «назад» некуда — запроса прокрутки нет.
+        viewModel.onTap(pageIndex = 0, x = 50f, y = 1200f)
+        assertNull(viewModel.uiState.value.scrollTarget)
+
+        viewModel.setMode(ReaderMode.RTL)
+        viewModel.onTap(pageIndex = 0, x = 50f, y = 1200f)
+        assertEquals(1, viewModel.uiState.value.scrollTarget)
+        assertFalse(viewModel.uiState.value.chromeVisible)
+    }
+
+    @Test
+    fun `hideChrome hides visible panels`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.hideChrome()
+        assertFalse(viewModel.uiState.value.chromeVisible)
+        viewModel.hideChrome()
+        assertFalse(viewModel.uiState.value.chromeVisible)
+    }
+
+    @Test
+    fun `jumpToPage moves instantly and coerces into range`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.jumpToPage(1)
+        val state = viewModel.uiState.value
+        assertEquals(1, state.currentPageIndex)
+        assertEquals(1, state.scrollTarget)
+        assertFalse(state.scrollTargetAnimated)
+
+        viewModel.jumpToPage(99)
+        assertEquals(1, viewModel.uiState.value.currentPageIndex)
+        viewModel.jumpToPage(-3)
+        assertEquals(0, viewModel.uiState.value.currentPageIndex)
+    }
+
+    @Test
+    fun `setting the same mode keeps zoom`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.onDoubleTapZoom(pageIndex = 0, focusX = viewWidth / 2f, focusY = 200f)
+        val zoomed = viewModel.uiState.value.transforms
+        assertTrue(zoomed.isNotEmpty())
+
+        viewModel.setMode(ReaderMode.WEBTOON)
+        assertEquals(zoomed, viewModel.uiState.value.transforms)
+        viewModel.setMode(ReaderMode.RTL)
+        assertTrue(viewModel.uiState.value.transforms.isEmpty())
+    }
+
+    @Test
+    fun `setShowOverlay sets explicit visibility`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.openedChapter()
+        viewModel.setShowOverlay(false)
+        assertFalse(viewModel.uiState.value.showOverlay)
+        viewModel.setShowOverlay(false)
+        assertFalse(viewModel.uiState.value.showOverlay)
+        viewModel.setShowOverlay(true)
+        assertTrue(viewModel.uiState.value.showOverlay)
+    }
+
+    @Test
+    fun `restored page opens without animation`() = runTest {
+        val viewModel = viewModelReturning(chapter())
+        viewModel.setViewportSize(viewWidth, viewHeight)
+        viewModel.openChapter(File("dir"), initialPageIndex = 1)
+        val state = withTimeout(STATE_TIMEOUT_MS) { viewModel.uiState.first { it.chapter != null } }
+        assertEquals(1, state.currentPageIndex)
+        assertEquals(1, state.scrollTarget)
+        assertFalse(state.scrollTargetAnimated)
+        assertNull(state.scrollStep)
+    }
+
+    @Test
+    fun `translation toggle is available only with overlay specs`() {
+        assertFalse(chapter().hasOverlays)
+        val spec = OverlaySpec(
+            bubbleId = "b1",
+            pageIndex = 0,
+            lines = listOf(OverlayLine(text = "Привет", baselineStart = PointF(x = 10f, y = 30f), widthPx = 60f)),
+            sizePx = 20f,
+            lineSpacingMult = 1f,
+            letterSpacing = 0f,
+            scaleX = 1f,
+            colorArgb = 0xFF000000.toInt(),
+        )
+        val translated = chapter().let { base ->
+            base.copy(pages = base.pages.mapIndexed { index, page -> if (index == 0) page.copy(overlays = listOf(spec)) else page })
+        }
+        assertTrue(translated.hasOverlays)
     }
 
     @Test

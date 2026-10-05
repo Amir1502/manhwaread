@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
@@ -12,11 +13,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,6 +42,7 @@ import com.manhwaread.feature.downloads.DownloadsRoute
 import com.manhwaread.feature.history.HistoryRoute
 import com.manhwaread.feature.library.LibraryRoute
 import com.manhwaread.feature.onboarding.OnboardingRoute
+import com.manhwaread.feature.reader.ReaderNavigationActions
 import com.manhwaread.feature.reader.ReaderScreen
 import com.manhwaread.feature.settings.SettingsRoute
 
@@ -109,6 +113,10 @@ private fun MainScaffold(viewModel: RootViewModel = hiltViewModel()) {
 
     Scaffold(
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
+        // Читалка сама раскладывает отступы (вырезы, бары вместе с панелями):
+        // innerPadding на её маршруте нулевой, иначе контент прыгал бы при
+        // показе/скрытии системных баров.
+        contentWindowInsets = if (isReaderRoute) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         bottomBar = {
             if (!isReaderRoute) {
                 ManhwareadBottomBar(
@@ -218,6 +226,7 @@ fun ManhwareadNavHost(
                 mangaId = mangaId,
                 chapterId = chapterId,
                 onBack = { navController.popBackStack() },
+                onOpenChapter = { targetChapterId -> navController.navigateToSiblingChapter(mangaId, targetChapterId) },
             )
         }
     }
@@ -231,12 +240,20 @@ private fun ReaderNavScreen(
     mangaId: Long,
     chapterId: Long,
     onBack: () -> Unit,
+    onOpenChapter: (chapterId: Long) -> Unit,
     viewModel: ReaderNavViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(mangaId, chapterId) {
         viewModel.open(mangaId, chapterId)
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val navigationActions = remember(viewModel, onOpenChapter) {
+        ReaderNavigationActions(
+            onOpenChapter = onOpenChapter,
+            onToggleBookmark = viewModel::toggleBookmark,
+            onModeChange = viewModel::onReaderModeChanged,
+        )
+    }
     if (state.isStreaming || state.streamError != null) {
         ReaderStreamPane(
             state = state,
@@ -249,6 +266,8 @@ private fun ReaderNavScreen(
             onBack = onBack,
             initialPageIndex = state.initialPageIndex,
             onProgress = { pageIndex -> viewModel.onPageChanged(pageIndex) },
+            navigation = state.navigation,
+            navigationActions = navigationActions,
         )
     }
 }
@@ -319,4 +338,12 @@ private fun NavHostController.navigateToDetailsBySource(sourceId: Long, mangaUrl
 // Офлайн-читалка скачанной главы (ФАЗА 15).
 private fun NavHostController.navigateToReader(mangaId: Long, chapterId: Long) {
     navigate("reader/$mangaId/$chapterId")
+}
+
+// Соседняя глава / пункт оглавления: текущая читалка заменяется новой, чтобы
+// «назад» возвращал в карточку тайтла, а не листал прочитанные главы.
+private fun NavHostController.navigateToSiblingChapter(mangaId: Long, chapterId: Long) {
+    navigate("reader/$mangaId/$chapterId") {
+        popUpTo(READER_ROUTE) { inclusive = true }
+    }
 }

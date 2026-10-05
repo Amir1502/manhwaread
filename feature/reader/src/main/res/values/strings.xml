@@ -6,8 +6,6 @@
     <string name="reader_mode_vertical">Vertical pages</string>
     <string name="reader_mode_ltr">Left to right</string>
     <string name="reader_mode_rtl">Right to left</string>
-    <string name="reader_overlay_show">Show translation</string>
-    <string name="reader_overlay_hide">Hide translation</string>
     <string name="reader_bubble_original">Original</string>
     <string name="reader_bubble_translated">Translation</string>
     <string name="reader_no_translation">No translation yet</string>
@@ -17,4 +15,15 @@
     <string name="reader_page_progress_pattern">%1$d / %2$d</string>
     <string name="reader_mode_selector">Reading mode</string>
     <string name="reader_slider_description">Page navigation slider</string>
+    <string name="reader_bookmark_add">Bookmark this page</string>
+    <string name="reader_bookmark_remove">Remove bookmark</string>
+    <string name="reader_chapter_previous">Previous chapter</string>
+    <string name="reader_chapter_next">Next chapter</string>
+    <string name="reader_toc">Chapters</string>
+    <string name="reader_toc_empty">Chapter list is unavailable</string>
+    <string name="reader_toc_current">Current chapter</string>
+    <string name="reader_toc_read">Read</string>
+    <string name="reader_overlay_original">Original</string>
+    <string name="reader_overlay_translation">Translation</string>
+    <string name="reader_translation_unavailable">No translation for this chapter</string>
 </resources>

@@ -92,6 +92,18 @@ data class ReaderPage(
 data class ReaderChapter(
     val title: String,
     val pages: List<ReaderPage>,
+) {
+    // Есть векторный слой перевода хотя бы на одной странице: только тогда
+    // тумблер «Оригинал ↔ Перевод» активен (стриминговые главы — без перевода).
+    val hasOverlays: Boolean get() = pages.any { page -> page.overlays.isNotEmpty() }
+}
+
+// Шаг прокрутки вебтуна тапом по краю экрана: direction = -1 (назад) / +1
+// (вперёд); token делает каждый запрос уникальным — два одинаковых тапа
+// подряд не сливаются в один (LaunchedEffect перезапускается по значению).
+data class ReaderScrollStep(
+    val direction: Int,
+    val token: Long,
 )
 
 // Выбранный тапом бабл: контент нижней панели.
@@ -114,6 +126,9 @@ data class ReaderUiState(
     val viewportHeightPx: Float = 0f,
     val selectedBubble: SelectedBubble? = null,
     val scrollTarget: Int? = null,
+    // false — мгновенный переход (слайдер, восстановление позиции), true — анимация (листание тапом).
+    val scrollTargetAnimated: Boolean = true,
+    val scrollStep: ReaderScrollStep? = null,
     val isLoading: Boolean = false,
     val loadError: String? = null,
 ) {

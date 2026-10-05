@@ -49,6 +49,8 @@ class ReaderViewModel @Inject constructor(
                             transforms = emptyMap(),
                             currentPageIndex = startPage,
                             scrollTarget = startPage.takeIf { page -> page > 0 },
+                            scrollTargetAnimated = false,
+                            scrollStep = null,
                         )
                     }
                 },
@@ -72,12 +74,25 @@ class ReaderViewModel @Inject constructor(
     }
 
     // Смена режима сбрасывает зум: базовый масштаб в режимах разный.
+    // Повторная установка того же режима (сохранённый режим тайтла) зум не трогает.
     fun setMode(mode: ReaderMode) {
-        _uiState.update { state -> state.copy(mode = mode, transforms = emptyMap()) }
+        _uiState.update { state ->
+            if (state.mode == mode) state else state.copy(mode = mode, transforms = emptyMap(), scrollStep = null)
+        }
+    }
+
+    // Автоскрытие панелей: пользователь начал прокрутку/перелистывание жестом.
+    fun hideChrome() {
+        _uiState.update { state -> if (state.chromeVisible) state.copy(chromeVisible = false) else state }
     }
 
     fun toggleOverlay() {
         _uiState.update { state -> state.copy(showOverlay = !state.showOverlay) }
+    }
+
+    // Сегментный тумблер «Оригинал | Перевод»: явное значение вместо переключения.
+    fun setShowOverlay(show: Boolean) {
+        _uiState.update { state -> if (state.showOverlay == show) state else state.copy(showOverlay = show) }
     }
 
     fun setCurrentPage(pageIndex: Int) {
@@ -121,9 +136,11 @@ class ReaderViewModel @Inject constructor(
     }
 
     // Тап по странице: попадание по баблу открывает карточку «оригинал + перевод».
-    // Промах сначала закрывает открытую карточку и только затем переключает
-    // видимость панелей читалки (immersive-режим полного экрана).
-    fun onTap(pageIndex: Int, x: Float, y: Float) {
+    // Промах сначала закрывает открытую карточку, затем скрывает видимые панели;
+    // при скрытых панелях работает зона тапа: центральная треть показывает
+    // панели, крайние — листают. x/y — координаты страницы (для баблов),
+    // viewportY — вертикаль во вьюпорте (в вебтуне страница сдвинута лентой).
+    fun onTap(pageIndex: Int, x: Float, y: Float, viewportY: Float = y) {
         val state = _uiState.value
         val page = state.chapter?.pages?.getOrNull(pageIndex) ?: return
         val hit = hitTestBubble(x, y, state.transformFor(pageIndex), page.bubbles)
@@ -137,9 +154,26 @@ class ReaderViewModel @Inject constructor(
                     ),
                 )
                 current.selectedBubble != null -> current.copy(selectedBubble = null)
-                else -> current.copy(chromeVisible = !current.chromeVisible)
+                current.chromeVisible -> current.copy(chromeVisible = false)
+                else -> current.afterZoneTap(
+                    resolveTapAction(x, viewportY, current.viewportWidthPx, current.viewportHeightPx, current.mode),
+                )
             }
         }
+    }
+
+    // Слайдер: мгновенный переход на выбранную страницу после отпускания бегунка.
+    fun jumpToPage(pageIndex: Int) {
+        _uiState.update { state ->
+            val pages = state.chapter?.pages ?: return@update state
+            val target = pageIndex.coerceIn(0, pages.lastIndex)
+            state.copy(currentPageIndex = target, scrollTarget = target, scrollTargetAnimated = false)
+        }
+    }
+
+    // Шаг ленты выполнен (или отменён) — сбрасываем только этот запрос, не более новый.
+    fun consumeScrollStep(step: ReaderScrollStep) {
+        _uiState.update { state -> if (state.scrollStep == step) state.copy(scrollStep = null) else state }
     }
 
     fun dismissBubbleSheet() {
@@ -148,12 +182,29 @@ class ReaderViewModel @Inject constructor(
 
     // Внешний запрос прокрутки (слайдер): отдельная ячейка scrollTarget,
     // чтобы репорт текущей страницы не отменял анимацию прокрутки.
-    fun requestScrollToPage(pageIndex: Int) {
-        _uiState.update { state -> state.copy(scrollTarget = pageIndex) }
+    fun requestScrollToPage(pageIndex: Int, animated: Boolean = true) {
+        _uiState.update { state -> state.copy(scrollTarget = pageIndex, scrollTargetAnimated = animated) }
     }
 
     fun consumeScrollTarget() {
         _uiState.update { state -> state.copy(scrollTarget = null) }
+    }
+
+    // Зона тапа при скрытых панелях: центр — показать панели; края — соседняя
+    // страница в пейджерах или шаг прокрутки ленты в вебтуне.
+    private fun ReaderUiState.afterZoneTap(action: ReaderTapAction): ReaderUiState {
+        val lastPage = chapter?.pages?.lastIndex ?: return this
+        val direction = when (action) {
+            ReaderTapAction.TOGGLE_CHROME -> return copy(chromeVisible = true)
+            ReaderTapAction.PREVIOUS -> -1
+            ReaderTapAction.NEXT -> 1
+        }
+        if (mode.isContinuousWebtoon) {
+            val token = (scrollStep?.token ?: 0L) + 1L
+            return copy(scrollStep = ReaderScrollStep(direction = direction, token = token))
+        }
+        val target = (currentPageIndex + direction).coerceIn(0, lastPage)
+        return if (target == currentPageIndex) this else copy(scrollTarget = target, scrollTargetAnimated = true)
     }
 
     // В вебтуне вертикаль отдаёт скроллу ленты — фокус/дельта Y обнуляются.

@@ -6,8 +6,6 @@
     <string name="reader_mode_vertical">Вертикально</string>
     <string name="reader_mode_ltr">Слева направо</string>
     <string name="reader_mode_rtl">Справа налево</string>
-    <string name="reader_overlay_show">Показать перевод</string>
-    <string name="reader_overlay_hide">Скрыть перевод</string>
     <string name="reader_bubble_original">Оригинал</string>
     <string name="reader_bubble_translated">Перевод</string>
     <string name="reader_no_translation">Перевода пока нет</string>
@@ -17,4 +15,15 @@
     <string name="reader_page_progress_pattern">%1$d / %2$d</string>
     <string name="reader_mode_selector">Режим чтения</string>
     <string name="reader_slider_description">Ползунок страниц</string>
+    <string name="reader_bookmark_add">Добавить закладку</string>
+    <string name="reader_bookmark_remove">Убрать закладку</string>
+    <string name="reader_chapter_previous">Предыдущая глава</string>
+    <string name="reader_chapter_next">Следующая глава</string>
+    <string name="reader_toc">Оглавление</string>
+    <string name="reader_toc_empty">Список глав недоступен</string>
+    <string name="reader_toc_current">Текущая глава</string>
+    <string name="reader_toc_read">Прочитано</string>
+    <string name="reader_overlay_original">Оригинал</string>
+    <string name="reader_overlay_translation">Перевод</string>
+    <string name="reader_translation_unavailable">Для этой главы нет перевода</string>
 </resources>

@@ -1,18 +1,22 @@
 package com.manhwaread.feature.reader
 
-import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
@@ -23,19 +27,19 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.manhwaread.core.designsystem.ManhwareadPalette
@@ -49,23 +53,41 @@ private val SheetBottomPadding = 24.dp
 private val SheetBlockSpacing = 8.dp
 private const val CORRUPT_PAGE_HEIGHT_DP = 240
 
+// Тап по краю вебтуна прокручивает ленту на 80% высоты экрана: строка
+// у края остаётся видимой и служит ориентиром после прокрутки.
+private const val WEBTOON_TAP_SCROLL_FRACTION = 0.8f
+
 // Экран читалки: четыре режима (вебтун-лента, вертикальный и горизонтальные
 // пейджеры), зум до 5x, векторный слой перевода, карточка бабла по тапу.
-// initialPageIndex/onProgress — интеграция с историей чтения (ФАЗА 15).
-@OptIn(ExperimentalMaterial3Api::class)
+// initialPageIndex/onProgress — интеграция с историей чтения (ФАЗА 15);
+// navigation/navigationActions — контекст тайтла от хоста (Этап 8): оглавление,
+// соседние главы, закладки и сохранённый режим чтения.
 @Composable
 fun ReaderScreen(
     chapterDir: File?,
     onBack: () -> Unit,
     initialPageIndex: Int = 0,
     onProgress: (pageIndex: Int) -> Unit = {},
+    navigation: ReaderNavigation = ReaderNavigation(),
+    navigationActions: ReaderNavigationActions = ReaderNavigationActions(),
     viewModel: ReaderViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ImmersiveSystemBarsEffect()
+    var tocVisible by rememberSaveable { mutableStateOf(false) }
+    // Сохранённый режим тайтла применяется один раз: после поворота экрана
+    // выбор пользователя в текущей сессии не перетирается.
+    var appliedPreferredMode by rememberSaveable { mutableStateOf<ReaderMode?>(null) }
+    ImmersiveSystemBarsEffect(barsVisible = state.chromeVisible)
     LaunchedEffect(chapterDir, initialPageIndex) {
         if (chapterDir != null) {
             viewModel.openChapter(chapterDir, initialPageIndex)
+        }
+    }
+    LaunchedEffect(navigation.preferredMode) {
+        val preferred = navigation.preferredMode
+        if (preferred != null && preferred != appliedPreferredMode) {
+            appliedPreferredMode = preferred
+            viewModel.setMode(preferred)
         }
     }
     LaunchedEffect(state.chapter, state.currentPageIndex) {
@@ -82,70 +104,134 @@ fun ReaderScreen(
             },
     ) {
         ReaderContent(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
-
-        val chapter = state.chapter
-        val pageCount = chapter?.pages?.size ?: 0
-
-        AnimatedVisibility(
-            visible = !state.chromeVisible && pageCount > 0,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            ReaderMinimalInfoStrip(
-                currentPage = state.currentPageIndex,
-                pageCount = pageCount,
-            )
-        }
-
-        AnimatedVisibility(
-            visible = state.chromeVisible,
-            enter = slideInVertically { -it } + fadeIn(),
-            exit = slideOutVertically { -it } + fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter),
-        ) {
-            ReaderTopBar(
-                title = chapter?.title.orEmpty(),
-                onBack = onBack,
-            )
-        }
-
-        AnimatedVisibility(
-            visible = state.chromeVisible && chapter != null && pageCount > 0,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            ReaderBottomBar(
-                state = state,
-                pageCount = pageCount,
-                onPageChange = { page -> viewModel.setCurrentPage(page) },
-                onPageChangeFinished = { viewModel.requestScrollToPage(state.currentPageIndex) },
-                onToggleOverlay = viewModel::toggleOverlay,
-                onSelectMode = viewModel::setMode,
-            )
-        }
+        ReaderChrome(
+            state = state,
+            navigation = navigation,
+            onBack = onBack,
+            actions = ReaderChromeActions(
+                onPageSelected = viewModel::jumpToPage,
+                onSelectMode = { mode ->
+                    viewModel.setMode(mode)
+                    navigationActions.onModeChange(mode)
+                },
+                onShowOverlay = viewModel::setShowOverlay,
+                onOpenChapter = navigationActions.onOpenChapter,
+                onToggleBookmark = navigationActions.onToggleBookmark,
+                onOpenToc = { tocVisible = true },
+            ),
+        )
 
         state.selectedBubble?.let { bubble ->
             ReaderBubbleSheet(bubble = bubble, onDismiss = viewModel::dismissBubbleSheet)
         }
+        if (tocVisible) {
+            ReaderTocSheet(
+                chapters = navigation.chapters,
+                currentChapterId = navigation.currentChapterId,
+                onSelectChapter = { chapterId ->
+                    tocVisible = false
+                    if (chapterId != navigation.currentChapterId) {
+                        navigationActions.onOpenChapter(chapterId)
+                    }
+                },
+                onDismiss = { tocVisible = false },
+            )
+        }
     }
 }
 
-// Immersive-полноэкран: пока читалка в композиции, системные бары скрыты,
-// свайп показывает их временно; при выходе со экрана бары возвращаются.
+// Колбэки панелей читалки (внутренние): ViewModel + действия хоста.
+private class ReaderChromeActions(
+    val onPageSelected: (Int) -> Unit,
+    val onSelectMode: (ReaderMode) -> Unit,
+    val onShowOverlay: (Boolean) -> Unit,
+    val onOpenChapter: (chapterId: Long) -> Unit,
+    val onToggleBookmark: (pageIndex: Int) -> Unit,
+    val onOpenToc: () -> Unit,
+)
+
+// Панели и инфо-полоса поверх контента. Инфо-полоса — только в вебтуне при
+// скрытых панелях; батарея и часы активны, лишь пока она в композиции.
 @Composable
-private fun ImmersiveSystemBarsEffect() {
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val window = (view.context as? Activity)?.window
-        val controller = window?.let { activityWindow -> WindowInsetsControllerCompat(activityWindow, view) }
-        if (controller != null) {
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-        }
-        onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+private fun BoxScope.ReaderChrome(
+    state: ReaderUiState,
+    navigation: ReaderNavigation,
+    onBack: () -> Unit,
+    actions: ReaderChromeActions,
+) {
+    val chapter = state.chapter
+    val pageCount = chapter?.pages?.size ?: 0
+
+    AnimatedVisibility(
+        visible = !state.chromeVisible && state.mode.isContinuousWebtoon && pageCount > 0,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.align(Alignment.BottomCenter),
+    ) {
+        val battery = rememberBatteryPercent()
+        val clock = rememberClockText()
+        ReaderInfoStrip(text = formatInfoStrip(state.currentPageIndex, pageCount, battery, clock))
+    }
+
+    AnimatedVisibility(
+        visible = state.chromeVisible,
+        enter = slideInVertically { -it } + fadeIn(),
+        exit = slideOutVertically { -it } + fadeOut(),
+        modifier = Modifier.align(Alignment.TopCenter),
+    ) {
+        val chapterName = navigation.currentChapter?.title ?: chapter?.title
+        ReaderTopBar(
+            title = navigation.mangaTitle ?: chapter?.title.orEmpty(),
+            subtitle = chapterName?.takeIf { navigation.mangaTitle != null }?.let(::chapterSubtitle),
+            isBookmarked = state.currentPageIndex in navigation.bookmarkedPages,
+            onBack = onBack,
+            onToggleBookmark = if (navigation.supportsBookmarks && pageCount > 0) {
+                { actions.onToggleBookmark(state.currentPageIndex) }
+            } else {
+                null
+            },
+        )
+    }
+
+    AnimatedVisibility(
+        visible = state.chromeVisible && chapter != null && pageCount > 0,
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+        modifier = Modifier.align(Alignment.BottomCenter),
+    ) {
+        ReaderBottomBar(
+            state = ReaderBottomBarState(
+                currentPage = state.currentPageIndex,
+                pageCount = pageCount,
+                mode = state.mode,
+                showOverlay = state.showOverlay,
+                hasOverlays = chapter?.hasOverlays == true,
+                hasPreviousChapter = navigation.previousChapter != null,
+                hasNextChapter = navigation.nextChapter != null,
+                hasToc = navigation.chapters.isNotEmpty(),
+            ),
+            actions = ReaderBottomBarActions(
+                onPageSelected = actions.onPageSelected,
+                onSelectMode = actions.onSelectMode,
+                onShowOverlay = actions.onShowOverlay,
+                onPreviousChapter = { navigation.previousChapter?.let { item -> actions.onOpenChapter(item.chapterId) } },
+                onNextChapter = { navigation.nextChapter?.let { item -> actions.onOpenChapter(item.chapterId) } },
+                onOpenToc = actions.onOpenToc,
+            ),
+        )
+    }
+}
+
+// Автоскрытие панелей: начало прокрутки/перелистывания жестом скрывает их.
+// Программная прокрутка (слайдер, тап по краю) DragInteraction не порождает.
+@Composable
+private fun HideChromeOnDragEffect(interactionSource: InteractionSource, onDragStart: () -> Unit) {
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) {
+                currentOnDragStart()
+            }
         }
     }
 }
@@ -197,12 +283,14 @@ private fun WebtoonList(state: ReaderUiState, viewModel: ReaderViewModel) {
     LaunchedEffect(state.scrollTarget) {
         val target = state.scrollTarget
         if (target != null && target in pages.indices) {
-            listState.animateScrollToItem(target)
+            if (state.scrollTargetAnimated) listState.animateScrollToItem(target) else listState.scrollToItem(target)
         }
         if (target != null) {
             viewModel.consumeScrollTarget()
         }
     }
+    WebtoonScrollStepEffect(state = state, listState = listState, viewModel = viewModel)
+    HideChromeOnDragEffect(interactionSource = listState.interactionSource, onDragStart = viewModel::hideChrome)
     LaunchedEffect(listState) {
         snapshotFlow { findCenterVisibleItemIndex(listState.layoutInfo) }
             .distinctUntilChanged()
@@ -226,11 +314,30 @@ private fun WebtoonList(state: ReaderUiState, viewModel: ReaderViewModel) {
                     actions = ReaderPageActions(
                         onZoom = { factor, focusX, _ -> viewModel.onZoom(page.index, factor, focusX, 0f) },
                         onPan = { deltaX, _ -> viewModel.onPan(page.index, deltaX, 0f) },
-                        onTap = { x, y -> viewModel.onTap(page.index, x, y) },
+                        onTap = { x, y ->
+                            // Зона тапа считается во вьюпорте: к локальной Y страницы
+                            // добавляется смещение элемента в ленте.
+                            val itemOffset = listState.layoutInfo.visibleItemsInfo
+                                .firstOrNull { info -> info.index == position }?.offset ?: 0
+                            viewModel.onTap(page.index, x, y, viewportY = itemOffset + y)
+                        },
                         onDoubleTapZoom = { x, _ -> viewModel.onDoubleTapZoom(page.index, x, 0f) },
                     ),
                 )
             }
+        }
+    }
+}
+
+// Тап по краю ленты при скрытых панелях: плавная прокрутка на долю экрана.
+// Каждый запрос уникален (token), выполненный — сбрасывается в ViewModel.
+@Composable
+private fun WebtoonScrollStepEffect(state: ReaderUiState, listState: LazyListState, viewModel: ReaderViewModel) {
+    val step = state.scrollStep
+    LaunchedEffect(step) {
+        if (step != null) {
+            listState.animateScrollBy(step.direction * state.viewportHeightPx * WEBTOON_TAP_SCROLL_FRACTION)
+            viewModel.consumeScrollStep(step)
         }
     }
 }
@@ -240,9 +347,10 @@ private fun HorizontalPagePager(state: ReaderUiState, viewModel: ReaderViewModel
     val pages = state.chapter?.pages ?: return
     val initialPage = state.currentPageIndex.coerceIn(0, pages.lastIndex)
     val pagerState = rememberPagerState(initialPage = initialPage) { pages.size }
-    PagerScrollEffects(state = state, viewModel = viewModel, pagerPage = { pagerState.currentPage }) { target ->
-        pagerState.animateScrollToPage(target)
+    PagerScrollEffects(state = state, viewModel = viewModel, pagerPage = { pagerState.currentPage }) { target, animated ->
+        if (animated) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
     }
+    HideChromeOnDragEffect(interactionSource = pagerState.interactionSource, onDragStart = viewModel::hideChrome)
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .distinctUntilChanged()
@@ -262,9 +370,10 @@ private fun VerticalPagePager(state: ReaderUiState, viewModel: ReaderViewModel) 
     val pages = state.chapter?.pages ?: return
     val initialPage = state.currentPageIndex.coerceIn(0, pages.lastIndex)
     val pagerState = rememberPagerState(initialPage = initialPage) { pages.size }
-    PagerScrollEffects(state = state, viewModel = viewModel, pagerPage = { pagerState.currentPage }) { target ->
-        pagerState.animateScrollToPage(target)
+    PagerScrollEffects(state = state, viewModel = viewModel, pagerPage = { pagerState.currentPage }) { target, animated ->
+        if (animated) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
     }
+    HideChromeOnDragEffect(interactionSource = pagerState.interactionSource, onDragStart = viewModel::hideChrome)
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .distinctUntilChanged()
@@ -275,20 +384,21 @@ private fun VerticalPagePager(state: ReaderUiState, viewModel: ReaderViewModel) 
     }
 }
 
-// Внешний запрос прокрутки (слайдер): отдельная ячейка scrollTarget, чтобы
-// репорт текущей страницы во время анимации не перезапускал LaunchedEffect.
+// Внешний запрос прокрутки (слайдер, тап по краю): отдельная ячейка scrollTarget,
+// чтобы репорт текущей страницы во время анимации не перезапускал LaunchedEffect.
+// Слайдер переходит мгновенно, тап по краю листает с анимацией.
 @Composable
 private fun PagerScrollEffects(
     state: ReaderUiState,
     viewModel: ReaderViewModel,
     pagerPage: () -> Int,
-    animateToPage: suspend (Int) -> Unit,
+    scrollToPage: suspend (target: Int, animated: Boolean) -> Unit,
 ) {
     val pages = state.chapter?.pages ?: return
     LaunchedEffect(state.scrollTarget) {
         val target = state.scrollTarget
         if (target != null && target in pages.indices && pagerPage() != target) {
-            animateToPage(target)
+            scrollToPage(target, state.scrollTargetAnimated)
         }
         if (target != null) {
             viewModel.consumeScrollTarget()

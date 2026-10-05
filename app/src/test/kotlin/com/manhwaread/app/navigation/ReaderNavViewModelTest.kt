@@ -3,17 +3,26 @@ package com.manhwaread.app.navigation
 import com.manhwaread.app.reader.StreamingChapterLoader
 import com.manhwaread.core.common.AppError
 import com.manhwaread.core.common.DomainResult
+import com.manhwaread.core.database.BookmarkDao
+import com.manhwaread.core.database.BookmarkEntity
 import com.manhwaread.core.database.ChapterDao
 import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.HistoryDao
 import com.manhwaread.core.database.HistoryEntity
+import com.manhwaread.core.database.MangaDao
+import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.datastore.ReaderSettingsStore
 import com.manhwaread.feature.downloads.queue.ChapterDirs
+import com.manhwaread.feature.reader.ReaderMode
+import com.manhwaread.source.api.MangaType
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -34,6 +43,7 @@ class ReaderNavViewModelTest {
     @BeforeEach
     fun setMainDispatcher() {
         Dispatchers.setMain(StandardTestDispatcher())
+        coEvery { mangaDao.findById(any()) } returns null
     }
 
     @AfterEach
@@ -67,6 +77,7 @@ class ReaderNavViewModelTest {
 
     private class FakeReaderChapterDao : ChapterDao {
         val readMarks = mutableListOf<Pair<Long, Boolean>>()
+        var chapters: List<ChapterEntity> = emptyList()
 
         override suspend fun insertIgnore(chapter: ChapterEntity): Long = chapter.id
 
@@ -83,7 +94,8 @@ class ReaderNavViewModelTest {
         override fun observeForManga(mangaId: Long): Flow<List<ChapterEntity>> =
             MutableStateFlow(emptyList())
 
-        override suspend fun allForManga(mangaId: Long): List<ChapterEntity> = emptyList()
+        override suspend fun allForManga(mangaId: Long): List<ChapterEntity> =
+            chapters.filter { chapter -> chapter.mangaId == mangaId }
 
         override suspend fun findById(id: Long): ChapterEntity? = null
 
@@ -96,12 +108,55 @@ class ReaderNavViewModelTest {
         override suspend fun deleteForManga(mangaId: Long) = Unit
     }
 
+    // Закладки в памяти: наблюдение отражает каждое изменение, как Room Flow.
+    private class FakeBookmarkDao : BookmarkDao {
+        val bookmarks = MutableStateFlow<List<BookmarkEntity>>(emptyList())
+        private var nextId = 1L
+
+        override suspend fun upsert(bookmark: BookmarkEntity): Long {
+            val id = if (bookmark.id == 0L) nextId++ else bookmark.id
+            bookmarks.value = bookmarks.value.filterNot { existing -> existing.id == id } + bookmark.copy(id = id)
+            return id
+        }
+
+        override fun observeForChapter(chapterId: Long): Flow<List<BookmarkEntity>> =
+            bookmarks.map { list -> list.filter { bookmark -> bookmark.chapterId == chapterId }.sortedBy { it.pageIndex } }
+
+        override suspend fun deleteById(id: Long) {
+            bookmarks.value = bookmarks.value.filterNot { bookmark -> bookmark.id == id }
+        }
+    }
+
+    private class FakeReaderSettingsStore : ReaderSettingsStore {
+        val modes = mutableMapOf<Long, String>()
+
+        override fun readerMode(mangaId: Long): Flow<String?> = flowOf(modes[mangaId])
+
+        override suspend fun setReaderMode(mangaId: Long, mode: String) {
+            modes[mangaId] = mode
+        }
+    }
+
     private val historyDao = FakeHistoryDao()
     private val chapterDao = FakeReaderChapterDao()
     private val streamingLoader = mockk<StreamingChapterLoader>()
+    private val mangaDao = mockk<MangaDao>()
+    private val bookmarkDao = FakeBookmarkDao()
+    private val readerSettings = FakeReaderSettingsStore()
 
     private fun viewModel(): ReaderNavViewModel =
-        ReaderNavViewModel(ChapterDirs(tempDir), historyDao, chapterDao, streamingLoader)
+        ReaderNavViewModel(
+            ChapterDirs(tempDir),
+            historyDao,
+            chapterDao,
+            streamingLoader,
+            mangaDao,
+            bookmarkDao,
+            readerSettings,
+        )
+
+    private fun manga(type: MangaType?, titleRu: String? = null) =
+        MangaEntity(id = 1L, sourceId = 7L, url = "/manga/1", title = "Sword King", titleRu = titleRu, type = type)
 
     // Каталог скачанной главы формата FileChapterLoader: метаданные + страница.
     private fun prepareOfflineChapter(chapterId: Long = 10L): File {
@@ -238,5 +293,95 @@ class ReaderNavViewModelTest {
         assertTrue(chapterDao.readMarks.isEmpty())
         assertFalse(viewModel.uiState.value.isOpen)
         assertNull(viewModel.uiState.value.chapterDir)
+    }
+
+    @Test
+    fun `navigation lists chapters in reading order with neighbours and russian title`() = runTest {
+        prepareOfflineChapter(chapterId = 11L)
+        coEvery { mangaDao.findById(1L) } returns manga(type = MangaType.MANHWA, titleRu = "Король меча")
+        chapterDao.chapters = listOf(
+            ChapterEntity(id = 12L, mangaId = 1L, url = "/c3", name = "Глава 3", chapterNumber = 3f),
+            ChapterEntity(id = 10L, mangaId = 1L, url = "/c1", name = "Глава 1", chapterNumber = 1f, read = true),
+            ChapterEntity(id = 11L, mangaId = 1L, url = "/c2", name = "Глава 2", chapterNumber = 2f),
+        )
+        val viewModel = viewModel()
+
+        viewModel.open(mangaId = 1L, chapterId = 11L)
+        advanceUntilIdle()
+
+        val navigation = viewModel.uiState.value.navigation
+        assertEquals("Король меча", navigation.mangaTitle)
+        assertEquals(listOf(10L, 11L, 12L), navigation.chapters.map { item -> item.chapterId })
+        assertTrue(navigation.chapters.first().isRead)
+        assertEquals(10L, navigation.previousChapter?.chapterId)
+        assertEquals(12L, navigation.nextChapter?.chapterId)
+        assertEquals(ReaderMode.WEBTOON, navigation.preferredMode)
+    }
+
+    @Test
+    fun `manga defaults to right to left and saved mode wins over default`() = runTest {
+        prepareOfflineChapter()
+        coEvery { mangaDao.findById(1L) } returns manga(type = MangaType.MANGA)
+        val viewModel = viewModel()
+
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+        assertEquals(ReaderMode.RTL, viewModel.uiState.value.navigation.preferredMode)
+        assertEquals("Sword King", viewModel.uiState.value.navigation.mangaTitle)
+
+        readerSettings.modes[1L] = ReaderMode.VERTICAL.name
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+        assertEquals(ReaderMode.VERTICAL, viewModel.uiState.value.navigation.preferredMode)
+    }
+
+    @Test
+    fun `mode change is saved for the title`() = runTest {
+        prepareOfflineChapter()
+        val viewModel = viewModel()
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+
+        viewModel.onReaderModeChanged(ReaderMode.LTR)
+        advanceUntilIdle()
+
+        assertEquals("LTR", readerSettings.modes[1L])
+        assertEquals(ReaderMode.LTR, viewModel.uiState.value.navigation.preferredMode)
+    }
+
+    @Test
+    fun `toggle bookmark adds then removes page bookmark`() = runTest {
+        prepareOfflineChapter()
+        val viewModel = viewModel()
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+
+        viewModel.toggleBookmark(4)
+        advanceUntilIdle()
+        assertEquals(setOf(4), viewModel.uiState.value.navigation.bookmarkedPages)
+        val saved = bookmarkDao.bookmarks.value.single()
+        assertEquals(1L, saved.mangaId)
+        assertEquals(10L, saved.chapterId)
+
+        viewModel.toggleBookmark(4)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.navigation.bookmarkedPages.isEmpty())
+        assertTrue(bookmarkDao.bookmarks.value.isEmpty())
+    }
+
+    @Test
+    fun `navigation load failure does not block opening chapter`() = runTest {
+        prepareOfflineChapter()
+        coEvery { mangaDao.findById(any()) } throws IllegalStateException("db closed")
+        val viewModel = viewModel()
+
+        viewModel.open(mangaId = 1L, chapterId = 10L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isOpen)
+        assertEquals(10L, state.navigation.currentChapterId)
+        assertNull(state.navigation.preferredMode)
+        assertTrue(state.navigation.chapters.isEmpty())
     }
 }
