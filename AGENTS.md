@@ -296,6 +296,27 @@ download_tasks/translation_jobs/segments (новые deleteForChapter(chapterId)
 больше не даёт COMPLETED с .bin-страницами; ошибка записи chapter.json
 помечает задачу FAILED вместо зависания в RUNNING.
 
+Обновление v0.2.0 (читалка по спеке этапа 8, финальный QA этапа 9):
+панели читалки — фон #121214 α0.92, отступы safeDrawing ∪
+systemBarsIgnoringVisibility (вырезы, ландшафт); системные бары показываются
+и прячутся вместе с панелями (ImmersiveSystemBarsEffect), на маршруте
+reader/* у Scaffold contentWindowInsets = 0. Тапы по зонам (resolveTapAction):
+центральная треть — панели, края — листание (в RTL зеркально), в вебтуне —
+плавная прокрутка на 80% экрана; панели скрываются в начале жеста прокрутки.
+Верхняя панель: titleRu ?: title, «Том 7 · Глава 302», закладка страницы
+(Room bookmarks). Нижняя панель: «‹ глава | номер | слайдер | всего | глава ›»
+(зеркалится в RTL), пузырь номера над бегунком, переход только после
+отпускания (jumpToPage); режим, оглавление (ReaderTocSheet: текущая глава
+подсвечена и видна сразу), тумблер «Оригинал | Перевод» активен только при
+наличии OverlaySpec. Режим чтения хранится по тайтлу (ReaderSettingsStore,
+ключ reader_mode_{mangaId}), по умолчанию манга → «Справа налево»,
+манхва/маньхуа → «Вебтун» (ReaderModePolicy в :app). Инфо-полоса «12 / 86 ·
+74% · 20:41» — только в вебтуне при скрытых панелях. Соседняя глава и пункт
+оглавления заменяют текущую читалку в back stack (popUpTo reader inclusive).
+Живой smoke-тест MangaMir (MangaMirLiveSmokeTest) запускается только с
+MANGAMIR_LIVE=1: `MANGAMIR_LIVE=1 ./gradlew :source:mangamir:test --tests
+'*MangaMirLiveSmokeTest*' --rerun --no-configuration-cache`; в CI пропускается.
+
 ## Запрещено
 
 - «Остальное по аналогии», `TODO`, заглушки.
