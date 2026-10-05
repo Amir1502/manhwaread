@@ -145,4 +145,49 @@ class TileMathTest {
         assertTrue(estimate > 0)
         assertTrue(estimate < 4_000_000L)
     }
+
+    @Test
+    fun `base layer for small page is not downsampled`() {
+        assertEquals(1, baseLayerSampleSize(512, 1024))
+    }
+
+    @Test
+    fun `base layer for 800x20000 webtoon fits side and pixel budget`() {
+        val sample = baseLayerSampleSize(800, 20000)
+        assertEquals(16, sample)
+        assertTrue(20000 / sample <= BASE_LAYER_MAX_SIDE)
+        assertTrue((800L / sample) * (20000L / sample) <= BASE_LAYER_MAX_PIXELS)
+    }
+
+    @Test
+    fun `base layer for large square page fits pixel budget`() {
+        val sample = baseLayerSampleSize(4000, 4000)
+        assertEquals(4, sample)
+    }
+
+    @Test
+    fun `base layer sample size is safe for degenerate sizes`() {
+        assertEquals(1, baseLayerSampleSize(0, 0))
+        assertEquals(1, baseLayerSampleSize(-5, 100))
+    }
+
+    @Test
+    fun `fallback sample sizes prefer finer then coarser and exclude target`() {
+        assertEquals(listOf(2, 1, 8, 16, 32, 64), fallbackSampleSizes(4))
+        assertEquals(listOf(2, 4, 8, 16, 32, 64), fallbackSampleSizes(1))
+        assertTrue(fallbackSampleSizes(64).none { value -> value == 64 })
+    }
+
+    @Test
+    fun `fallback sample sizes tolerate non positive target`() {
+        assertEquals(fallbackSampleSizes(1), fallbackSampleSizes(0))
+    }
+
+    @Test
+    fun `failure limit never exceeds tile count of the page`() {
+        assertEquals(1, tileFailureLimit(512, 512))
+        assertEquals(2, tileFailureLimit(512, 1024))
+        assertEquals(TILE_FAILURE_LIMIT, tileFailureLimit(800, 20000))
+        assertEquals(1, tileFailureLimit(0, 0))
+    }
 }

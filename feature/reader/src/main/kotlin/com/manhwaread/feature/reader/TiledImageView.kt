@@ -19,6 +19,7 @@ import java.io.FileInputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 // Тайловый рендеринг страницы: BitmapRegionDecoder декодирует только видимые
@@ -32,8 +33,28 @@ import java.util.concurrent.atomic.AtomicLong
 // Тайловая математика обрезана по фактически видимой полосе вью
 // (getLocalVisibleRect), поэтому длинная страница вебтуна не тянет в кэш
 // все тайлы сразу.
+// Этап 3 (надёжность движка):
+//  - ключ тайла содержит эпоху изображения — тайл прежней страницы не может
+//    попасть на новую, даже если фоновый декод завершился после setImage;
+//  - базовый слой: обзорный растр всей страницы (малое разрешение) рисуется
+//    под тайлами, поэтому при смене шага прореживания в пинче нет серых дыр;
+//  - при отсутствии тайла нужного шага рисуется тайл того же прямоугольника
+//    другого шага (fallbackSampleSizes), пока не приземлится точный;
+//  - сбойный тайл не перезапрашивается каждый кадр (иначе бесконечный цикл
+//    декод → invalidate → декод); OOM сжимает кэш вместо фатальной ошибки;
+//  - размеры сетки берутся у самого декодера, а не у вызывающего.
 class TiledImageView(context: Context) : View(context) {
-    private data class TileKey(val rect: TileRect, val sampleSize: Int)
+    private data class TileKey(val rect: TileRect, val sampleSize: Int, val epoch: Long)
+
+    private class BaseLayer(val epoch: Long, val bitmap: Bitmap)
+
+    private sealed interface DecodeOutcome {
+        class Decoded(val bitmap: Bitmap) : DecodeOutcome
+
+        data object Failed : DecodeOutcome
+
+        data object OutOfMemory : DecodeOutcome
+    }
 
     // Колбэк жёсткой ошибки декодирования (декодер не открылся или тайлы
     // стабильно не декодируются). Вызывается на главном потоке, один раз
@@ -47,9 +68,18 @@ class TiledImageView(context: Context) : View(context) {
     private var decodeExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val generation = AtomicLong(0)
+
+    // Эпоха изображения: растёт на setImage и detach. Всё, что декодировано
+    // под другой эпохой, отбрасывается.
+    private val imageEpoch = AtomicLong(0)
+    private val baseLayerRequested = AtomicBoolean(false)
+
+    @Volatile
+    private var baseLayer: BaseLayer? = null
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val placeholderPaint = Paint().apply { color = PLACEHOLDER_COLOR }
     private val destRect = RectF()
+    private val baseDestRect = RectF()
     private val bandRect = Rect()
 
     // Защита от livelock: пока летящий батч запрашивает ровно тот же набор
@@ -57,29 +87,41 @@ class TiledImageView(context: Context) : View(context) {
     private var lastRequestedKeys: Set<TileKey> = emptySet()
     private var requestInFlight = false
 
-    // Ключи тайлов, декодирование которых завершилось ошибкой; >= 3 разных
-    // ключей при пустом кэше — жёсткая ошибка страницы (onDecodeError).
+    // Ключи тайлов, декодирование которых завершилось ошибкой; их не
+    // перезапрашиваем. Достижение порога при пустом кэше — жёсткая ошибка
+    // страницы (onDecodeError).
     private val failedTileKeys: MutableSet<TileKey> = ConcurrentHashMap.newKeySet()
     private var errorReported = false
 
     private var decoder: BitmapRegionDecoder? = null
     private var sourceStream: FileInputStream? = null
     private var currentFile: File? = null
+
+    // Размеры, запрошенные вызывающим (для isSameImage), и фактические
+    // размеры растра по данным декодера (сетка тайлов и математика).
+    private var requestedWidthPx = 0
+    private var requestedHeightPx = 0
     private var imageWidthPx = 0
     private var imageHeightPx = 0
     private var transform = ViewportTransform.IDENTITY
     private var baseScale = 1f
 
     // Файл страницы; размеры известны заранее (от загрузчика) — раскладка
-    // возможна без декодирования. Повторная установка того же файла — no-op.
+    // возможна без декодирования. Повторная установка того же файла — no-op
+    // (в том числе после жёсткой ошибки — до пересоздания вью).
     fun setImage(file: File, widthPx: Int, heightPx: Int) {
-        if (decoder != null && isSameImage(file, widthPx, heightPx)) {
+        if ((decoder != null || errorReported) && isSameImage(file, widthPx, heightPx)) {
             return
         }
         errorReported = false
         failedTileKeys.clear()
         releaseDecoder()
         tileCache.evictAll()
+        baseLayer = null
+        baseLayerRequested.set(false)
+        imageEpoch.incrementAndGet()
+        requestedWidthPx = widthPx
+        requestedHeightPx = heightPx
         imageWidthPx = widthPx
         imageHeightPx = heightPx
         currentFile = file
@@ -98,8 +140,14 @@ class TiledImageView(context: Context) : View(context) {
         invalidate()
     }
 
-    // Тестовый хук: число декодированных тайлов в кэше.
-    internal fun cachedTileCount(): Int = tileCache.size()
+    // Тестовые хуки.
+    internal fun cachedTileCount(): Int = tileCache.snapshot().size
+
+    internal fun cachedTileEpochs(): Set<Long> = tileCache.snapshot().keys.map { key -> key.epoch }.toSet()
+
+    internal fun currentEpoch(): Long = imageEpoch.get()
+
+    internal fun hasBaseLayer(): Boolean = currentBaseLayer() != null
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -117,7 +165,10 @@ class TiledImageView(context: Context) : View(context) {
             imageWidthPx = imageWidthPx,
             imageHeightPx = imageHeightPx,
         ) ?: return
+        val base = currentBaseLayer()
+        drawBaseLayer(canvas, base)
         val sampleSize = sampleSizeForScale(transform.scale)
+        val epoch = imageEpoch.get()
         var missing = false
         for (tile in visibleTiles(visible, imageWidthPx, imageHeightPx)) {
             destRect.set(
@@ -126,14 +177,22 @@ class TiledImageView(context: Context) : View(context) {
                 transform.toScreenX(tile.right.toFloat()),
                 transform.toScreenY(tile.bottom.toFloat()),
             )
-            val bitmap = tileCache.get(TileKey(tile, sampleSize))
-            if (bitmap == null) {
-                // Плейсхолдер вместо пропуска: пользователь видит нейтральные
-                // серые квадраты загрузки, а не чёрные дыры фона темы.
-                missing = true
-                canvas.drawRect(destRect, placeholderPaint)
-            } else {
+            val key = TileKey(tile, sampleSize, epoch)
+            val bitmap = tileCache.get(key)
+            if (bitmap != null) {
                 canvas.drawBitmap(bitmap, null, destRect, bitmapPaint)
+                continue
+            }
+            // Точного тайла ещё нет: тайл другого шага того же прямоугольника,
+            // иначе базовый слой, иначе нейтральный серый плейсхолдер.
+            val stale = findFallbackTile(tile, sampleSize, epoch)
+            if (stale != null) {
+                canvas.drawBitmap(stale, null, destRect, bitmapPaint)
+            } else if (base == null) {
+                canvas.drawRect(destRect, placeholderPaint)
+            }
+            if (key !in failedTileKeys) {
+                missing = true
             }
         }
         if (missing) {
@@ -143,16 +202,44 @@ class TiledImageView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         generation.incrementAndGet()
+        imageEpoch.incrementAndGet()
         requestInFlight = false
         lastRequestedKeys = emptySet()
         decodeExecutor.shutdown()
         releaseDecoder()
         tileCache.evictAll()
+        baseLayer = null
+        baseLayerRequested.set(false)
         super.onDetachedFromWindow()
     }
 
     private fun isSameImage(file: File, widthPx: Int, heightPx: Int): Boolean =
-        file == currentFile && widthPx == imageWidthPx && heightPx == imageHeightPx
+        file == currentFile && widthPx == requestedWidthPx && heightPx == requestedHeightPx
+
+    private fun currentBaseLayer(): BaseLayer? = baseLayer?.takeIf { layer -> layer.epoch == imageEpoch.get() }
+
+    private fun drawBaseLayer(canvas: Canvas, base: BaseLayer?) {
+        if (base == null) {
+            return
+        }
+        baseDestRect.set(
+            transform.toScreenX(0f),
+            transform.toScreenY(0f),
+            transform.toScreenX(imageWidthPx.toFloat()),
+            transform.toScreenY(imageHeightPx.toFloat()),
+        )
+        canvas.drawBitmap(base.bitmap, null, baseDestRect, bitmapPaint)
+    }
+
+    private fun findFallbackTile(tile: TileRect, targetSampleSize: Int, epoch: Long): Bitmap? {
+        for (candidate in fallbackSampleSizes(targetSampleSize)) {
+            val bitmap = tileCache.get(TileKey(tile, candidate, epoch))
+            if (bitmap != null) {
+                return bitmap
+            }
+        }
+        return null
+    }
 
     // Фактически видимая полоса вью в её собственных координатах: учитывает
     // обрезку родительскими контейнерами (LazyColumn). Null — вью не
@@ -172,7 +259,7 @@ class TiledImageView(context: Context) : View(context) {
     }
 
     // Недостающие тайлы видимой полосы; пустой набор — запрашивать нечего
-    // (вью вне экрана, нет изображения или всё уже в кэше).
+    // (вью вне экрана, нет изображения или всё уже в кэше / уже сбойное).
     private fun missingTileKeys(): Set<TileKey> {
         if (width == 0 || height == 0 || imageWidthPx == 0) {
             return emptySet()
@@ -188,9 +275,10 @@ class TiledImageView(context: Context) : View(context) {
             imageHeightPx = imageHeightPx,
         ) ?: return emptySet()
         val sampleSize = sampleSizeForScale(transform.scale)
+        val epoch = imageEpoch.get()
         return visibleTiles(visible, imageWidthPx, imageHeightPx)
-            .map { tile -> TileKey(tile, sampleSize) }
-            .filter { key -> tileCache.get(key) == null }
+            .map { tile -> TileKey(tile, sampleSize, epoch) }
+            .filter { key -> key !in failedTileKeys && tileCache.get(key) == null }
             .toSet()
     }
 
@@ -209,31 +297,45 @@ class TiledImageView(context: Context) : View(context) {
         lastRequestedKeys = missing
         requestInFlight = true
         val currentGeneration = generation.incrementAndGet()
+        val epoch = imageEpoch.get()
         // RejectedExecutionException возможен при гонке с detach — не падаем.
-        runCatching { ensureExecutor().execute { decodeBatch(activeDecoder, missing, currentGeneration) } }
-            .onFailure { requestInFlight = false }
+        runCatching {
+            ensureExecutor().execute { decodeBatch(activeDecoder, missing, currentGeneration, epoch) }
+        }.onFailure { requestInFlight = false }
     }
 
     // Фоновый батч: флаги сбрасываются на главном потоке и только если
     // поколение ещё наше — иначе эстафету несёт более новый батч, а прежде-
     // временный сброс снова разрешил бы отмену летящего декодирования.
-    private fun decodeBatch(activeDecoder: BitmapRegionDecoder, keys: Set<TileKey>, batchGeneration: Long) {
+    // Базовый слой строится после первого батча страницы: видимые тайлы
+    // приоритетнее обзорного растра.
+    private fun decodeBatch(
+        activeDecoder: BitmapRegionDecoder,
+        keys: Set<TileKey>,
+        batchGeneration: Long,
+        epoch: Long,
+    ) {
         for (key in keys) {
             if (generation.get() != batchGeneration) {
                 break
             }
-            val bitmap = decodeTile(activeDecoder, key)
-            if (bitmap == null) {
-                recordTileFailure(key)
-            } else {
-                tileCache.put(key, bitmap)
+            when (val outcome = decodeTile(activeDecoder, key)) {
+                is DecodeOutcome.Decoded -> {
+                    // Тайл прежнего изображения не кладём в кэш нового.
+                    if (imageEpoch.get() == epoch) {
+                        tileCache.put(key, outcome.bitmap)
+                    }
+                }
+                DecodeOutcome.Failed -> recordTileFailure(key)
+                DecodeOutcome.OutOfMemory -> handleOutOfMemory(key)
             }
         }
+        decodeBaseLayerIfNeeded(activeDecoder, epoch)
         mainHandler.post {
             if (generation.get() == batchGeneration) {
                 requestInFlight = false
-                invalidate()
             }
+            invalidate()
         }
     }
 
@@ -246,23 +348,61 @@ class TiledImageView(context: Context) : View(context) {
         return decodeExecutor
     }
 
-    private fun decodeTile(activeDecoder: BitmapRegionDecoder, key: TileKey): Bitmap? =
-        synchronized(decoderLock) {
-            if (activeDecoder.isRecycled) {
-                null
-            } else {
-                val options = BitmapFactory.Options().apply { inSampleSize = key.sampleSize }
-                val region = Rect(key.rect.left, key.rect.top, key.rect.right, key.rect.bottom)
-                runCatching { activeDecoder.decodeRegion(region, options) }.getOrNull()
-            }
-        }
+    private fun decodeTile(activeDecoder: BitmapRegionDecoder, key: TileKey): DecodeOutcome {
+        val region = Rect(key.rect.left, key.rect.top, key.rect.right, key.rect.bottom)
+        return decodeRegionLocked(activeDecoder, region, key.sampleSize)
+    }
 
-    // Ошибка тайла не молчалива: >= 3 разных сбойных тайла при пустом кэше —
-    // страница недекодируема, сообщаем наружу (UI покажет ошибку и retry).
+    private fun decodeBaseLayerIfNeeded(activeDecoder: BitmapRegionDecoder, epoch: Long) {
+        if (!baseLayerRequested.compareAndSet(false, true)) {
+            return
+        }
+        val region = Rect(0, 0, imageWidthPx, imageHeightPx)
+        val sample = baseLayerSampleSize(imageWidthPx, imageHeightPx)
+        val outcome = decodeRegionLocked(activeDecoder, region, sample)
+        if (outcome is DecodeOutcome.Decoded && imageEpoch.get() == epoch) {
+            baseLayer = BaseLayer(epoch, outcome.bitmap)
+        }
+    }
+
+    // Декод под замком: recycle/close декодера не может случиться внутри
+    // decodeRegion. Ошибки не молчаливы: результат различает сбой и OOM.
+    private fun decodeRegionLocked(
+        activeDecoder: BitmapRegionDecoder,
+        region: Rect,
+        sampleSize: Int,
+    ): DecodeOutcome = synchronized(decoderLock) {
+        if (activeDecoder.isRecycled) {
+            return@synchronized DecodeOutcome.Failed
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val result = runCatching { activeDecoder.decodeRegion(region, options) }
+        val bitmap = result.getOrNull()
+        when {
+            bitmap != null -> DecodeOutcome.Decoded(bitmap)
+            result.exceptionOrNull() is OutOfMemoryError -> DecodeOutcome.OutOfMemory
+            else -> DecodeOutcome.Failed
+        }
+    }
+
+    // Порог зависит от числа тайлов самой страницы: порог 3 при одном тайле
+    // не наступил бы никогда. Сбойные ключи не перезапрашиваются.
     private fun recordTileFailure(key: TileKey) {
         failedTileKeys += key
-        if (failedTileKeys.size >= TILE_FAILURE_LIMIT && tileCache.size() == 0) {
+        val limit = tileFailureLimit(imageWidthPx, imageHeightPx)
+        if (failedTileKeys.size >= limit && tileCache.size() == 0) {
             reportDecodeError()
+        }
+    }
+
+    // OOM при непустом кэше — освобождаем половину и пробуем позже (тайл не
+    // помечается сбойным); при пустом кэше памяти не хватит и на один тайл —
+    // это обычная ошибка страницы.
+    private fun handleOutOfMemory(key: TileKey) {
+        if (tileCache.size() == 0) {
+            recordTileFailure(key)
+        } else {
+            tileCache.trimToSize(tileCache.size() / 2)
         }
     }
 
@@ -292,9 +432,7 @@ class TiledImageView(context: Context) : View(context) {
             reportDecodeError()
             return
         }
-        synchronized(decoderLock) {
-            decoder = created
-        }
+        adoptDecoder(created, stream = null)
     }
 
     // Двухпараметрический newInstance(InputStream, isShareable) существует с
@@ -312,10 +450,27 @@ class TiledImageView(context: Context) : View(context) {
             reportDecodeError()
             return
         }
+        adoptDecoder(created, stream)
+    }
+
+    // Декодер с нулевыми размерами непригоден; сетка тайлов строится по
+    // фактическим размерам растра, чтобы запрос региона за пределами
+    // изображения не превращался в сбой каждого тайла.
+    private fun adoptDecoder(created: BitmapRegionDecoder, stream: FileInputStream?) {
+        val actualWidth = created.width
+        val actualHeight = created.height
+        if (actualWidth <= 0 || actualHeight <= 0) {
+            runCatching { created.recycle() }
+            runCatching { stream?.close() }
+            reportDecodeError()
+            return
+        }
         synchronized(decoderLock) {
             decoder = created
             sourceStream = stream
         }
+        imageWidthPx = actualWidth
+        imageHeightPx = actualHeight
     }
 
     // Закрытие — под замком: поток декодирования не может находиться внутри
@@ -336,9 +491,6 @@ class TiledImageView(context: Context) : View(context) {
     private companion object {
         // Бюджет LRU-кэша: 1/8 heap — стандартная практика кэшей изображений.
         const val CACHE_MEMORY_DIVISOR = 8L
-
-        // Число разных сбойных тайлов, после которого страница считается недекодируемой.
-        const val TILE_FAILURE_LIMIT = 3
 
         // Нейтральный серый плейсхолдер незагруженного тайла (совпадает с UI-заглушкой).
         val PLACEHOLDER_COLOR: Int = 0xFF2C2F36.toInt()

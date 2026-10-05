@@ -123,3 +123,58 @@ fun maxDecodedPixelsPerFrame(
     val visibleHeight = viewHeightPx / scale + tileSize
     return max(1L, visibleWidth.toLong() * visibleHeight.toLong())
 }
+
+// Бюджет базового слоя (обзорного растра всей страницы): не более 1 млн px
+// (~4 МБ ARGB_8888) и не более 2048 px по стороне — безопасно для лимита
+// аппаратной текстуры при отрисовке.
+const val BASE_LAYER_MAX_PIXELS = 1_000_000L
+const val BASE_LAYER_MAX_SIDE = 2048
+
+// Верхняя граница шага прореживания базового слоя (защита цикла подбора).
+const val BASE_LAYER_MAX_SAMPLE_SIZE = 256
+
+// Наибольший шаг прореживания, который ещё ищется среди тайлов-заменителей.
+const val MAX_FALLBACK_SAMPLE_SIZE = 64
+
+// Порог «страница недекодируема»: до 3 разных сбойных тайлов, но не больше
+// числа тайлов самой страницы — иначе одно-тайловая битая страница
+// никогда не сообщила бы об ошибке.
+const val TILE_FAILURE_LIMIT = 3
+
+// Шаг прореживания базового слоя: наименьшая степень двойки, при которой
+// обзорный растр укладывается в бюджет по пикселям и по стороне.
+fun baseLayerSampleSize(imageWidthPx: Int, imageHeightPx: Int): Int {
+    if (imageWidthPx <= 0 || imageHeightPx <= 0) {
+        return 1
+    }
+    var sample = 1
+    while (sample < BASE_LAYER_MAX_SAMPLE_SIZE) {
+        val width = imageWidthPx / sample
+        val height = imageHeightPx / sample
+        val fits = width <= BASE_LAYER_MAX_SIDE &&
+            height <= BASE_LAYER_MAX_SIDE &&
+            width.toLong() * height.toLong() <= BASE_LAYER_MAX_PIXELS
+        if (fits) {
+            break
+        }
+        sample *= 2
+    }
+    return sample
+}
+
+// Порядок поиска тайла-заменителя того же прямоугольника при смене шага
+// прореживания (пинч): сначала более чёткие (target/2 … 1), затем более
+// грубые (target*2 … MAX). Целевой шаг в список не входит.
+fun fallbackSampleSizes(targetSampleSize: Int): List<Int> {
+    val target = targetSampleSize.coerceAtLeast(1)
+    val finer = generateSequence(target / 2) { value -> value / 2 }
+        .takeWhile { value -> value >= 1 }
+        .toList()
+    val coarser = generateSequence(target * 2) { value -> value * 2 }
+        .takeWhile { value -> value <= MAX_FALLBACK_SAMPLE_SIZE }
+        .toList()
+    return finer + coarser
+}
+
+fun tileFailureLimit(imageWidthPx: Int, imageHeightPx: Int): Int =
+    minOf(TILE_FAILURE_LIMIT, max(1, tileCount(imageWidthPx, imageHeightPx)))

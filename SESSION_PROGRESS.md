@@ -14,13 +14,14 @@
 - [x] Спеки этапов 2–4 (очередь, ошибки AI, читалка, данные) — субагент-архитектор, сверено с официальной документацией Android / Gemini / OpenAI / Anthropic.
 - [x] Этап 1 — `:source:mangamir`. Реализован полный JVM-модуль источника MangaMir (`MangaMirSource`, `MangaMirParser`, `MangaMirJsonLd`, `MangaMirUrls`), зарегистрирован в `SourceModule.kt` и `settings.gradle.kts`. Проверено: `./gradlew :source:mangamir:ktlintCheck :source:mangamir:detekt :source:mangamir:test` (18 из 18 тестов прошли, detekt и ktlint без ошибок).
 - [x] Этап 2 — надёжность конвейера очереди. Защита от двойной обработки задач (мьютексы загрузки и перевода), откат зависших задач при рестарте (`recoverStaleTasks`, `requeueStalledJobs`), запрет бесконечных ретраев перманентных ошибок провайдера (401 ProviderAuth, 402/456 ProviderQuota), автоматическая очистка временных `.tmp` файлов (`sweepTempFiles`, `NonCancellable` при сбоях), сквозной канал уведомлений `QueueErrorNotifier` и показ Snackbar с переходом в «Настройки» в `:app`. Проверено: `./gradlew :feature:downloads:testDebugUnitTest :feature:downloads:ktlintCheck :feature:downloads:detekt :app:compileDebugKotlin :app:ktlintCheck :app:detekt` (16 из 16 тестов `QueueProcessorTest` прошли, detekt и ktlint без замечаний, сборка `:app` успешна).
+- [x] Этап 3 — движок читалки (`TiledImageView`, `TileMath`). Ключ тайла содержит эпоху изображения (тайл прежней страницы не попадёт на новую); базовый слой (обзорный растр страницы, бюджет 1 млн px / 2048 px по стороне) и тайлы-заменители другого шага прореживания убирают серые дыры при пинче; сбойные тайлы не перезапрашиваются каждый кадр; OOM сжимает кэш; размеры сетки берутся у декодера; порог ошибки ограничен числом тайлов страницы (одно-тайловая битая страница теперь сообщает об ошибке). Проверено: `./gradlew :feature:reader:detekt :feature:reader:ktlintCheck :feature:reader:testDebugUnitTest :app:compileDebugKotlin`. Не проверено на устройстве: реальный `BitmapRegionDecoder` на обрезанном PNG (Robolectric-шэдоу такой сбой не моделирует), визуальное отсутствие артефактов при быстром pinch на странице 800×20000 — нужен ручной прогон.
 
 ## 3. В процессе (In Progress)
-- [ ] Ожидание ревью этапа 2 / переход к этапу 3 (движок читалки: `TiledImageView`, pinch-zoom, `BitmapRegionDecoder`).
+- [ ] Ожидание ревью этапа 3 / переход к этапу 4 (контракты и данные: аддитивные поля Source API, `ReadingStatus`, миграции Room).
 
 ## 4. Что предстоит сделать (Backlog)
 - [x] P1 · Этап 2 — надёжность конвейера: lease + recovery очереди, очистка `cacheDir`, типизированные ошибки AI (401 / 429) → snackbar «Настройки».
-- [ ] P1 · Этап 3 — движок читалки: `TiledImageView` (pinch-zoom), безопасный `BitmapRegionDecoder`.
+- [x] P1 · Этап 3 — движок читалки: `TiledImageView` (pinch-zoom), безопасный `BitmapRegionDecoder`.
 - [ ] P2 · Этап 4 — контракты и данные: аддитивные поля Source API, `ReadingStatus`, прогресс чтения, миграции Room + тесты.
 - [ ] P2 · Этап 5 — `:core:designsystem`: токены Mangalib, формы, типографика, базовые компоненты, конфиг detekt / ktlint для Compose.
 - [ ] P2 · Этап 6 — `:feature:browse` + `:feature:library`: карточки 3:4 с бейджами, табы статусов.
