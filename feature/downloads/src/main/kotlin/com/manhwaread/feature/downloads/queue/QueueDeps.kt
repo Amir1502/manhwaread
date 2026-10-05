@@ -30,6 +30,8 @@ data class QueueComponents @Inject constructor(
     val compositor: OverlayCompositor,
     val archiveWriter: ChapterArchiveWriter,
     val providerFactory: TranslationProviderFactory,
+    val chapterDirs: ChapterDirs? = null,
+    val errorNotifier: QueueErrorNotifier? = null,
 )
 
 // Данные очереди: DAO задач/тайтлов и настройки перевода с ключами.

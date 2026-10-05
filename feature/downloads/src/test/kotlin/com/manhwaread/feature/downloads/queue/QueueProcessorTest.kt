@@ -51,6 +51,7 @@ class QueueProcessorTest {
     private val segmentStore = InMemorySegmentStore()
     private lateinit var source: FakePageSource
     private lateinit var dirs: ChapterDirs
+    private val errorNotifier = QueueErrorNotifier()
     private lateinit var processor: QueueProcessor
 
     private val pageBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1)
@@ -75,6 +76,8 @@ class QueueProcessorTest {
             compositor = compositor,
             archiveWriter = ChapterArchiveWriter(dirs, Dispatchers.Unconfined),
             providerFactory = TranslationProviderFactory(OkHttpClient()),
+            chapterDirs = dirs,
+            errorNotifier = errorNotifier,
         )
         val data = QueueData(
             taskDao = taskDao,
@@ -257,6 +260,8 @@ class QueueProcessorTest {
         assertEquals(StageStatus.FAILED, job?.status)
         assertEquals(1, job?.attempts)
         assertTrue(job?.lastError?.contains("ProviderAuth") == true, "lastError=${job?.lastError}")
+        val emittedError = errorNotifier.poll()
+        assertTrue(emittedError is AppError.ProviderAuth, "emittedError=$emittedError")
         // Пустая очередь — false.
         assertEquals(false, processor.processNextTranslationJob())
     }
@@ -296,6 +301,40 @@ class QueueProcessorTest {
     }
 
     @Test
+    fun `translated archive write failure marks job failed instead of stuck in done`() = runTest {
+        val (mangaId, chapterId) = seedChapter()
+        settingsStore.updateTranslation(
+            TranslationSettings(
+                providerId = OPENAI_COMPAT_PROVIDER_ID,
+                baseUrl = server.url("/v1").toString(),
+                model = "test-model",
+            ),
+        )
+        apiKeyStore.saveApiKey(OPENAI_COMPAT_PROVIDER_ID, "test-key")
+        jobDao.upsertEntity(
+            TranslationJobEntity(
+                id = "translate-$chapterId",
+                sourceId = 7L,
+                mangaId = mangaId,
+                chapterId = chapterId,
+                chapterUrl = "/ch/10",
+                createdAt = 1L,
+            ),
+        )
+        analyzer.outcome = DomainResult.success(listOf(koSegment("s1")))
+        seedPages(count = 1)
+        server.enqueue(MockResponse().setBody(chatCompletion("""[{"id":"s1","text":"Привет"}]""")))
+        File(dirs.ensureDirFor(chapterId), ChapterArchiveWriter.META_FILE_NAME).mkdirs()
+
+        assertTrue(processor.processNextTranslationJob())
+
+        val job = jobDao.findEntityById("translate-$chapterId")
+        assertEquals(StageStatus.FAILED, job?.status)
+        assertEquals(1, job?.attempts)
+        assertNotNull(job?.lastError)
+    }
+
+    @Test
     fun `requeue stalled jobs respects attempts and terminal statuses`() = runTest {
         jobDao.upsertEntity(jobEntity("j-failed-once", StageStatus.FAILED, attempts = 1))
         jobDao.upsertEntity(jobEntity("j-failed-max", StageStatus.FAILED, attempts = MAX_ATTEMPTS_LIMIT))
@@ -313,6 +352,19 @@ class QueueProcessorTest {
     }
 
     @Test
+    fun `requeue stalled jobs skips auth and quota failures but retries network failures`() = runTest {
+        jobDao.upsertEntity(jobEntity("j-auth", StageStatus.FAILED, attempts = 1, lastError = "ProviderAuth"))
+        jobDao.upsertEntity(jobEntity("j-quota", StageStatus.FAILED, attempts = 1, lastError = "ProviderQuota"))
+        jobDao.upsertEntity(jobEntity("j-net", StageStatus.FAILED, attempts = 1, lastError = "Network(cause=timeout)"))
+
+        assertTrue(processor.requeueStalledJobs())
+
+        assertEquals(StageStatus.FAILED, jobDao.findEntityById("j-auth")?.status)
+        assertEquals(StageStatus.FAILED, jobDao.findEntityById("j-quota")?.status)
+        assertEquals(StageStatus.QUEUED, jobDao.findEntityById("j-net")?.status)
+    }
+
+    @Test
     fun `recover stale tasks resets running to pending`() = runTest {
         val taskId = taskDao.seedTask(
             DownloadTaskEntity(mangaId = 1L, chapterId = 2L, status = DownloadStatus.RUNNING, progress = 0.4f),
@@ -323,6 +375,18 @@ class QueueProcessorTest {
         val task = taskDao.findById(taskId)
         assertEquals(DownloadStatus.PENDING, task?.status)
         assertEquals(0f, task?.progress)
+    }
+
+    @Test
+    fun `recover stale tasks sweeps orphaned temp files`() = runTest {
+        val chapterDir = dirs.ensureDirFor(chapterId = 42L)
+        val tempFile = File(chapterDir, "page001.tmp")
+        tempFile.writeText("corrupted partial download")
+        assertTrue(tempFile.exists())
+
+        processor.recoverStaleTasks()
+
+        assertFalse(tempFile.exists())
     }
 
     private fun assertFalseMeta(chapterId: Long) {
@@ -345,7 +409,7 @@ class QueueProcessorTest {
         return """{"choices":[{"message":{"role":"assistant","content":"$escaped"}}]}"""
     }
 
-    private fun jobEntity(id: String, status: StageStatus, attempts: Int) = TranslationJobEntity(
+    private fun jobEntity(id: String, status: StageStatus, attempts: Int, lastError: String? = null) = TranslationJobEntity(
         id = id,
         sourceId = 7L,
         mangaId = 1L,
@@ -354,6 +418,7 @@ class QueueProcessorTest {
         createdAt = 1L,
         status = status,
         attempts = attempts,
+        lastError = lastError,
     )
 
     private companion object {

@@ -76,14 +76,39 @@ fun ManhwareadRoot(viewModel: RootViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun MainScaffold() {
+private fun MainScaffold(viewModel: RootViewModel = hiltViewModel()) {
     val navController = rememberNavController()
+    val snackbarHostState = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     // Читалка — полноэкранная: на её маршруте нижняя навигация не показывается,
     // innerPadding снизу становится нулевым и контент занимает весь экран.
     val isReaderRoute = currentRoute?.startsWith(READER_ROUTE_PREFIX) == true
+
+    LaunchedEffect(viewModel.errorNotifier) {
+        viewModel.errorNotifier.errors.collect { error ->
+            val message = when (error) {
+                is com.manhwaread.core.common.AppError.ProviderAuth ->
+                    "Ошибка авторизации переводчика. Проверьте API-ключ."
+                is com.manhwaread.core.common.AppError.ProviderQuota ->
+                    "Лимит квоты перевода исчерпан."
+                is com.manhwaread.core.common.AppError.RateLimited ->
+                    "Слишком много запросов к переводчику. Попробуйте позже."
+                else -> "Ошибка перевода: $error"
+            }
+            val result = snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = "Настройки",
+                duration = androidx.compose.material3.SnackbarDuration.Long,
+            )
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                navController.navigateToTab(AppRoute.SETTINGS)
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (!isReaderRoute) {
                 ManhwareadBottomBar(

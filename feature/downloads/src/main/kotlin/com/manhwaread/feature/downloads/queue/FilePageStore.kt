@@ -20,17 +20,22 @@ class FilePageStore(
         withContext(ioDispatcher) {
             val dir = chapterDirs.ensureDirFor(chapterId)
             val target = File(dir, "${pageName(pageIndex)}.${extensionFor(bytes)}")
-            // Атомарная запись: сначала временный файл, затем rename. Смерть процесса
-            // посреди записи больше не оставляет усечённую страницу в кэше главы.
             val tmp = File(dir, "${target.name}$TMP_SUFFIX")
-            tmp.writeBytes(bytes)
-            // Повторная загрузка страницы заменяет файл: удаляем старые расширения
-            // и временный мусор прежних прогонов (rename в Windows не перезаписывает цель).
-            pageFiles(dir, pageIndex).forEach { file -> file.delete() }
-            tmpFiles(dir, pageIndex).filter { file -> file != tmp }.forEach { file -> file.delete() }
-            if (!tmp.renameTo(target)) {
-                tmp.delete()
-                throw IOException("page $pageIndex of chapter $chapterId: rename to ${target.name} failed")
+            try {
+                tmp.writeBytes(bytes)
+                pageFiles(dir, pageIndex).forEach { file -> file.delete() }
+                tmpFiles(dir, pageIndex).filter { file -> file != tmp }.forEach { file -> file.delete() }
+                if (!tmp.renameTo(target)) {
+                    tmp.delete()
+                    throw IOException("page $pageIndex of chapter $chapterId: rename to ${target.name} failed")
+                }
+            } catch (t: Throwable) {
+                withContext(kotlinx.coroutines.NonCancellable) {
+                    if (tmp.exists()) {
+                        tmp.delete()
+                    }
+                }
+                throw t
             }
         }
 

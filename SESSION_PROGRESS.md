@@ -13,12 +13,13 @@
 - [x] План декомпозиции: 9 этапов с Blast Radius, контрактами и DoD (страница «manhwaread» в Notion).
 - [x] Спеки этапов 2–4 (очередь, ошибки AI, читалка, данные) — субагент-архитектор, сверено с официальной документацией Android / Gemini / OpenAI / Anthropic.
 - [x] Этап 1 — `:source:mangamir`. Реализован полный JVM-модуль источника MangaMir (`MangaMirSource`, `MangaMirParser`, `MangaMirJsonLd`, `MangaMirUrls`), зарегистрирован в `SourceModule.kt` и `settings.gradle.kts`. Проверено: `./gradlew :source:mangamir:ktlintCheck :source:mangamir:detekt :source:mangamir:test` (18 из 18 тестов прошли, detekt и ktlint без ошибок).
+- [x] Этап 2 — надёжность конвейера очереди. Защита от двойной обработки задач (мьютексы загрузки и перевода), откат зависших задач при рестарте (`recoverStaleTasks`, `requeueStalledJobs`), запрет бесконечных ретраев перманентных ошибок провайдера (401 ProviderAuth, 402/456 ProviderQuota), автоматическая очистка временных `.tmp` файлов (`sweepTempFiles`, `NonCancellable` при сбоях), сквозной канал уведомлений `QueueErrorNotifier` и показ Snackbar с переходом в «Настройки» в `:app`. Проверено: `./gradlew :feature:downloads:testDebugUnitTest :feature:downloads:ktlintCheck :feature:downloads:detekt :app:compileDebugKotlin :app:ktlintCheck :app:detekt` (16 из 16 тестов `QueueProcessorTest` прошли, detekt и ktlint без замечаний, сборка `:app` успешна).
 
 ## 3. В процессе (In Progress)
-- [ ] Ожидание ревью этапа 1 / переход к этапу 2 (надёжность конвейера очереди и воркеров).
+- [ ] Ожидание ревью этапа 2 / переход к этапу 3 (движок читалки: `TiledImageView`, pinch-zoom, `BitmapRegionDecoder`).
 
 ## 4. Что предстоит сделать (Backlog)
-- [ ] P1 · Этап 2 — надёжность конвейера: lease + recovery очереди, очистка `cacheDir`, типизированные ошибки AI (401 / 429) → snackbar «Настройки».
+- [x] P1 · Этап 2 — надёжность конвейера: lease + recovery очереди, очистка `cacheDir`, типизированные ошибки AI (401 / 429) → snackbar «Настройки».
 - [ ] P1 · Этап 3 — движок читалки: `TiledImageView` (pinch-zoom), безопасный `BitmapRegionDecoder`.
 - [ ] P2 · Этап 4 — контракты и данные: аддитивные поля Source API, `ReadingStatus`, прогресс чтения, миграции Room + тесты.
 - [ ] P2 · Этап 5 — `:core:designsystem`: токены Mangalib, формы, типографика, базовые компоненты, конфиг detekt / ktlint для Compose.
@@ -40,10 +41,10 @@
 | Нет автора и альт. названия | `getDetails` | отсутствуют и в JSON-LD, и в DOM | 📝 спека: `author = null`, `altTitle = null` |
 | Описание в JSON-LD обрезано | `getDetails` | `description` = первая фраза (125 из 832 символов) | 📝 спека: описание из DOM, JSON-LD — фолбэк |
 | Жанры карусели «Похожая манга» смешиваются с жанрами тайтла | DOM-фолбэк `getDetails` | у карточек карусели тоже `a[href^="/genre/"]` | 📝 спека: исключать `[x-data^="bookCarousel"]` |
-| Задачи висят в ANALYZING/TRANSLATING после kill/stop | QueueProcessor, Worker, DAO | (гипотеза) нет lease/recoverStale | 📝 спека 2a → Gemini |
-| Двойная обработка задачи | claim в DAO | (гипотеза) нет CAS и fencing, KEEP | 📝 спека 2a → Gemini |
-| Сироты temp в cacheDir | загрузчики задач | (гипотеза) cleanup без NonCancellable, нет sweep | 📝 спека 2b → Gemini |
-| Тихое падение на 401/429, ключ в логах | AI-клиенты, Scaffold :app | (гипотеза) нет классификатора, канала в UI и редакции | 📝 спека 2c → Gemini |
+| Задачи висят в ANALYZING/TRANSLATING после kill/stop | QueueProcessor, Worker, DAO | (гипотеза) нет lease/recoverStale | ✅ решено в этапе 2 (`recoverStaleTasks`, `requeueStalledJobs`) |
+| Двойная обработка задачи | claim в DAO | (гипотеза) нет CAS и fencing, KEEP | ✅ решено в этапе 2 (мьютексы `downloadMutex`, `translationMutex`) |
+| Сироты temp в cacheDir | загрузчики задач | (гипотеза) cleanup без NonCancellable, нет sweep | ✅ решено в этапе 2 (`sweepTempFiles`, `NonCancellable` в `FilePageStore`) |
+| Тихое падение на 401/429, ключ в логах | AI-клиенты, Scaffold :app | (гипотеза) нет классификатора, канала в UI и редакции | ✅ решено в этапе 2 (`QueueErrorNotifier`, Snackbar с «Настройки») |
 | Артефакты при резком pinch | TiledImageView | (гипотеза) sampleSize меняется в жесте, нет базового слоя, устаревшие тайлы | 📝 спека 3a → Gemini |
 | Краш на битых изображениях | BitmapRegionDecoder | (гипотеза) нет валидации, гонка recycle↔decode | 📝 спека 3b → Gemini |
 | Нет полей для бейджей и шапки | :source:api | нет полей в модели | 📝 спека 4.1 → Gemini |

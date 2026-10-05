@@ -26,6 +26,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Очередь приложения (ФАЗА 15): два последовательных воркера на одном scope —
@@ -44,6 +46,8 @@ class QueueProcessor(
 ) {
     // Прикладной scope очереди: живёт столько же, сколько процесс.
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val downloadMutex = Mutex()
+    private val translationMutex = Mutex()
 
     /** Запуск фоновых циклов; вызывается из Application.onCreate. */
     fun start() {
@@ -65,7 +69,7 @@ class QueueProcessor(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (e: Exception) {
-                Log.w(LOG_TAG, "queue worker iteration failed", e)
+                logWarn("queue worker iteration failed", e)
                 false
             }
             if (!processed) delay(IDLE_POLL_MS)
@@ -73,10 +77,10 @@ class QueueProcessor(
     }
 
     /** Одна задача скачивания: PENDING → RUNNING (прогресс по страницам) → COMPLETED/FAILED. */
-    suspend fun processNextDownloadTask(): Boolean {
+    suspend fun processNextDownloadTask(): Boolean = downloadMutex.withLock {
         val task = data.taskDao.observeByStatus(DownloadStatus.PENDING).first().firstOrNull()
             ?: return false
-        return runDownloadTask(task)
+        runDownloadTask(task)
     }
 
     private suspend fun runDownloadTask(task: DownloadTaskEntity): Boolean {
@@ -175,10 +179,11 @@ class QueueProcessor(
     }
 
     /** Одна задача перевода: QUEUED → конвейер → DONE + офлайн-архив главы. */
-    suspend fun processNextTranslationJob(): Boolean {
+    suspend fun processNextTranslationJob(): Boolean = translationMutex.withLock {
         val job = data.jobDao.next() ?: return false
         val provider = currentProvider()
         if (provider == null) {
+            components.errorNotifier?.notify(AppError.ProviderAuth)
             data.jobDao.update(
                 job.id,
                 job.state.copy(
@@ -190,8 +195,26 @@ class QueueProcessor(
             return true
         }
         val result = ChapterPipelineCoordinator(data.jobDao, pipelineStages(provider, job.ref.chapterId)).run(job.id)
+        val coordinatorError = result.errorOrNull()
+        if (coordinatorError != null && isPermanentFailure(coordinatorError)) {
+            components.errorNotifier?.notify(coordinatorError)
+        }
         if (result.getOrNull() != null) {
-            writeTranslatedArchive(job.ref.chapterId)
+            try {
+                writeTranslatedArchive(job.ref.chapterId)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (expected: Exception) {
+                logWarn("translated archive write failed for ${job.id}", expected)
+                data.jobDao.update(
+                    job.id,
+                    job.state.copy(
+                        status = StageStatus.FAILED,
+                        attempts = job.state.attempts + 1,
+                        lastError = AppError.Unknown(expected),
+                    ),
+                )
+            }
         }
         return true
     }
@@ -240,13 +263,16 @@ class QueueProcessor(
         data.taskDao.observeByStatus(DownloadStatus.RUNNING).first().forEach { task ->
             data.taskDao.updateProgress(task.id, DownloadStatus.PENDING, 0f)
         }
+        components.chapterDirs?.sweepTempFiles()
     }
 
     // Промежуточные стадии после обрыва процесса и FAILED с запасом попыток
     // возвращаются в QUEUED; DONE и CANCELLED не трогаем. internal — для unit-тестов.
     internal suspend fun requeueStalledJobs(): Boolean {
         val stalled = data.jobDao.all().filter { job ->
-            job.state.status in RETRYABLE_JOB_STATUSES && job.state.attempts < MAX_JOB_ATTEMPTS
+            job.state.status in RETRYABLE_JOB_STATUSES &&
+                job.state.attempts < MAX_JOB_ATTEMPTS &&
+                !isPermanentFailure(job.state.lastError)
         }
         stalled.forEach { job -> data.jobDao.update(job.id, job.state.copy(status = StageStatus.QUEUED)) }
         return stalled.isNotEmpty()
@@ -255,6 +281,22 @@ class QueueProcessor(
     private fun downloadJobId(chapterId: Long): String = "download-$chapterId"
 
     private fun translationJobId(chapterId: Long): String = "translate-$chapterId"
+
+    // Ошибки, которые повтор не лечит (неверный ключ, исчерпана квота): нужен ввод пользователя.
+    // После записи в БД AppError восстанавливается как Unknown(IllegalStateException(текст)).
+    private fun isPermanentFailure(error: AppError?): Boolean = when (error) {
+        AppError.ProviderAuth, AppError.ProviderQuota -> true
+        is AppError.Unknown -> error.cause.message in PERMANENT_ERROR_NAMES
+        else -> false
+    }
+
+    private fun logWarn(message: String, throwable: Throwable? = null) {
+        try {
+            Log.w(LOG_TAG, message, throwable)
+        } catch (_: Throwable) {
+            // JVM unit tests fallback
+        }
+    }
 
     private companion object {
         const val LOG_TAG = "QueueProcessor"
@@ -268,5 +310,6 @@ class QueueProcessor(
             StageStatus.FAILED,
         )
         val REQUEUEABLE_JOB_STATUSES = setOf(StageStatus.FAILED, StageStatus.CANCELLED)
+        val PERMANENT_ERROR_NAMES = setOf(AppError.ProviderAuth.toString(), AppError.ProviderQuota.toString())
     }
 }

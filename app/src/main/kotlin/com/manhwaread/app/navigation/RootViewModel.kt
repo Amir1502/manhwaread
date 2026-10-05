@@ -3,6 +3,7 @@ package com.manhwaread.app.navigation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.manhwaread.core.datastore.SettingsStore
+import com.manhwaread.feature.downloads.queue.QueueErrorNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class RootViewModel @Inject constructor(
     settingsStore: SettingsStore,
+    val errorNotifier: QueueErrorNotifier,
 ) : ViewModel() {
     val onboardingCompleted: StateFlow<Boolean?> = settingsStore.onboardingCompleted
         .stateIn(scope = viewModelScope, started = SharingStarted.Eagerly, initialValue = null)

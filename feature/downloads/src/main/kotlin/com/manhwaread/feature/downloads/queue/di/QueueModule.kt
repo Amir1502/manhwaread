@@ -3,10 +3,12 @@ package com.manhwaread.feature.downloads.queue.di
 import android.content.Context
 import com.manhwaread.core.database.RoomSegmentStore
 import com.manhwaread.core.database.SegmentDao
+import com.manhwaread.core.pipeline.ChapterAnalyzer
 import com.manhwaread.core.pipeline.OverlayCompositor
 import com.manhwaread.core.pipeline.OverlayStore
 import com.manhwaread.core.pipeline.PageStore
 import com.manhwaread.core.pipeline.SegmentStore
+import com.manhwaread.core.translation.TranslationProviderFactory
 import com.manhwaread.core.vision.TextMeasurer
 import com.manhwaread.feature.downloads.queue.ChapterArchiveWriter
 import com.manhwaread.feature.downloads.queue.ChapterDirs
@@ -14,16 +16,19 @@ import com.manhwaread.feature.downloads.queue.FileOverlayStore
 import com.manhwaread.feature.downloads.queue.FilePageStore
 import com.manhwaread.feature.downloads.queue.QueueComponents
 import com.manhwaread.feature.downloads.queue.QueueData
+import com.manhwaread.feature.downloads.queue.QueueErrorNotifier
 import com.manhwaread.feature.downloads.queue.QueueProcessor
 import com.manhwaread.feature.downloads.vision.BubbleStore
 import com.manhwaread.feature.downloads.vision.InMemoryBubbleStore
 import com.manhwaread.feature.downloads.vision.PaintTextMeasurer
 import com.manhwaread.feature.downloads.vision.TypesettingCompositor
+import com.manhwaread.source.api.SourceRegistry
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import java.io.File
 import javax.inject.Singleton
 
@@ -69,6 +74,37 @@ object QueueModule {
     @Singleton
     fun provideChapterArchiveWriter(chapterDirs: ChapterDirs): ChapterArchiveWriter =
         ChapterArchiveWriter(chapterDirs)
+
+    @Provides
+    @Singleton
+    @Suppress("LongParameterList")
+    fun provideQueueComponents(
+        registry: SourceRegistry,
+        httpClient: OkHttpClient,
+        pageStore: PageStore,
+        segmentStore: SegmentStore,
+        overlayStore: OverlayStore,
+        bubbleStore: BubbleStore,
+        analyzer: ChapterAnalyzer,
+        compositor: OverlayCompositor,
+        archiveWriter: ChapterArchiveWriter,
+        providerFactory: TranslationProviderFactory,
+        chapterDirs: ChapterDirs,
+        errorNotifier: QueueErrorNotifier,
+    ): QueueComponents = QueueComponents(
+        registry = registry,
+        httpClient = httpClient,
+        pageStore = pageStore,
+        segmentStore = segmentStore,
+        overlayStore = overlayStore,
+        bubbleStore = bubbleStore,
+        analyzer = analyzer,
+        compositor = compositor,
+        archiveWriter = archiveWriter,
+        providerFactory = providerFactory,
+        chapterDirs = chapterDirs,
+        errorNotifier = errorNotifier,
+    )
 
     @Provides
     @Singleton
