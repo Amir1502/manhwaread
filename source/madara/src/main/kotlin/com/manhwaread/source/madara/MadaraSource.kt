@@ -151,7 +151,7 @@ class MadaraSource(
     }
 
     private fun errorFor(code: Int, retryAfterHeader: String?): AppError = when {
-        code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN -> AppError.ProviderAuth
+        code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN -> AppError.CloudflareBlocked
         code == HTTP_NOT_FOUND -> AppError.SourceUnavailable
         code == HTTP_TOO_MANY_REQUESTS ->
             AppError.RateLimited(retryAfterHeader?.toLongOrNull()?.let { seconds -> seconds * MILLIS_PER_SECOND })

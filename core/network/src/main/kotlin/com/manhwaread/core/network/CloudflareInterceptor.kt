@@ -89,13 +89,19 @@ class CloudflareInterceptor(
         return chain.proceed(retry)
     }
 
-    // 403/503 + Server: cloudflare + маркеры challenge-страницы в теле.
+    // 403/503 + Cloudflare (Server или cf-ray) + маркеры challenge-страницы (заголовок или тело).
     private fun Response.isCloudflareChallenge(): Boolean {
         val statusMatch = code == STATUS_FORBIDDEN || code == STATUS_UNAVAILABLE
-        val serverMatch = header("Server")?.equals("cloudflare", ignoreCase = true) == true
-        if (!statusMatch || !serverMatch) return false
+        val isCloudflare = header("Server")?.contains("cloudflare", ignoreCase = true) == true ||
+            header("cf-ray") != null
+        if (!statusMatch || !isCloudflare) return false
+        if (header("cf-mitigated").equals("challenge", ignoreCase = true)) return true
         val body = peekBody(CHALLENGE_PEEK_BYTES).string().lowercase()
-        return "just a moment" in body || "cf-chl" in body
+        return "just a moment" in body ||
+            "cf-chl" in body ||
+            "challenge-platform" in body ||
+            "turnstile" in body ||
+            "attention required" in body
     }
 
     private companion object {

@@ -2,17 +2,19 @@ package com.manhwaread.core.network
 
 import okhttp3.Cache
 import okhttp3.ConnectionPool
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/** User-Agent приложения по умолчанию (источник может переопределить на запрос). */
-const val DEFAULT_USER_AGENT = "Manhwaread/0.1 (+https://gitlab.com/folzi-group/manhwaread)"
+/** User-Agent приложения по умолчанию (имитирует реальный браузер для обхода WAF/Cloudflare). */
+const val DEFAULT_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
 
 /**
  * Конфигурация HTTP-клиента: заголовки, таймауты, дисковый кэш,
- * решатель Cloudflare. Домены источников задают Referer через [refererByDomain].
+ * DNS-резолвер и решатель Cloudflare. Домены источников задают Referer через [refererByDomain].
  */
 data class HttpClientConfig(
     val userAgent: String = DEFAULT_USER_AGENT,
@@ -23,6 +25,7 @@ data class HttpClientConfig(
     val cacheDirectory: File? = null,
     val cacheMaxBytes: Long = DEFAULT_CACHE_BYTES,
     val cloudflareSolver: CloudflareChallengeSolver = NoopChallengeSolver,
+    val dns: Dns = VpnSafeDns(),
 ) {
     companion object {
         const val DEFAULT_CACHE_BYTES = 50L * 1024L * 1024L // 50 MiB
@@ -31,12 +34,13 @@ data class HttpClientConfig(
 
 /**
  * Сборка OkHttpClient с фиксированным порядком интерсепторов:
- * заголовки → Cloudflare → ETag-кэш. Дисковый кэш OkHttp включается,
- * если задан [HttpClientConfig.cacheDirectory].
+ * DNS (IPv4-first + DoH) → заголовки → Cloudflare → ETag-кэш.
+ * Дисковый кэш OkHttp включается, если задан [HttpClientConfig.cacheDirectory].
  */
 object HttpClientFactory {
     fun create(config: HttpClientConfig = HttpClientConfig()): OkHttpClient {
         val builder = OkHttpClient.Builder()
+            .dns(config.dns)
             .connectTimeout(config.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(config.readTimeoutMs, TimeUnit.MILLISECONDS)
             .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))

@@ -231,6 +231,15 @@ class MadaraSourceTest {
     }
 
     @Test
+    fun `401 and 403 map to CloudflareBlocked`() {
+        server.enqueue(MockResponse().setResponseCode(403))
+        val error = assertThrows(SourceException::class.java) {
+            kotlinx.coroutines.runBlocking { source().getPopular(1) }
+        }
+        assertEquals(AppError.CloudflareBlocked, error.error)
+    }
+
+    @Test
     fun `server error maps to Network`() {
         server.enqueue(MockResponse().setResponseCode(503))
         val error = assertThrows(SourceException::class.java) {

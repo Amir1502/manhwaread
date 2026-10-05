@@ -49,22 +49,52 @@ class WebViewChallengeSolver @Inject constructor(
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         val userAgent = webView.settings.userAgentString
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, finishedUrl: String) {
-                val clearance = parseCfClearance(CookieManager.getInstance().getCookie(url))
-                if (clearance != null && continuation.isActive) {
-                    view.destroy()
-                    continuation.resume(CfClearance(clearance, userAgent))
+
+        fun checkClearance() {
+            val clearance = parseCfClearance(CookieManager.getInstance().getCookie(url))
+            if (clearance != null && continuation.isActive) {
+                continuation.resume(CfClearance(clearance, userAgent))
+            }
+        }
+
+        val pollRunnable = object : Runnable {
+            override fun run() {
+                if (continuation.isActive) {
+                    checkClearance()
+                    if (continuation.isActive) {
+                        webView.postDelayed(this, POLL_INTERVAL_MS)
+                    }
                 }
             }
         }
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, finishedUrl: String) {
+                checkClearance()
+            }
+
+            override fun onLoadResource(view: WebView, resUrl: String) {
+                checkClearance()
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView, viewUrl: String, isReload: Boolean) {
+                checkClearance()
+            }
+        }
+
+        webView.postDelayed(pollRunnable, POLL_INTERVAL_MS)
+
         // Отмена (в т.ч. по таймауту) уничтожает WebView — утечек окна нет.
-        continuation.invokeOnCancellation { webView.destroy() }
+        continuation.invokeOnCancellation {
+            webView.removeCallbacks(pollRunnable)
+            webView.destroy()
+        }
         webView.loadUrl(url)
     }
 
     companion object {
         const val SOLVE_TIMEOUT_MS = 20_000L
+        private const val POLL_INTERVAL_MS = 500L
     }
 }
 

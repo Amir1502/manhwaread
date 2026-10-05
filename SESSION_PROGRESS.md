@@ -1,7 +1,7 @@
 # Manhwaread — Session Progress & Context Tracking
 
 ## 1. Архитектурный контекст
-- Текущая версия: 0.2.0 (`versionCode 6`, `app/build.gradle.kts`) — minor-релиз после этапа 9 (было 0.1.4 / 5).
+- Текущая версия: 0.2.1 (`versionCode 7`, `app/build.gradle.kts`) — патч-релиз: полная совместимость с VPN (Manga18fx, IPv4-first, DoH, User CA, Coil ImageLoader).
 - Активные модули: `:core:*` (в т. ч. `:core:designsystem`), `:source:api`, `:source:*`, `:source:mangamir` (новый, JVM), `:feature:browse`, `:feature:library`, `:feature:details`, `:feature:reader`, `:app`.
 - Закреплённые контракты: `OverlaySpec`, `StageMachine`, Source API (`:source:api:Source`). Правило: только аддитивные изменения (nullable / значения по умолчанию), без переименований и смены сигнатур; всё остальное — через Opus.
 - MangaMir: `MANGAMIR_SOURCE_ID = 4001L`, `lang = "ru"`, `baseUrl = "https://mangamir.com"`; сайт — Laravel + Livewire + Alpine, SSR-HTML, JSON-LD `@graph`.
@@ -71,3 +71,4 @@
 | Режим чтения не запоминается по тайтлу | `:feature:reader`, `:core:datastore` | режим не сохранялся, любая глава (и манга) открывалась вебтуном | ✅ решено в доработке этапа 8 (`ReaderSettingsStore`, `defaultReaderModeFor`) |
 | ktlint / detekt на Compose-коде | DoD | `function-naming` для `@Composable`, `MagicNumber` для hex, `LongParameterList` | ✅ решено в этапе 5 (`.editorconfig` + `detekt.yml` ignoreAnnotated `Composable`) |
 | Контраст ниже WCAG AA | `:core:designsystem` | белый на `#FF6740` = 2.89:1; `#65656D` на `#1C1C1F` = 2.94:1 | ✅ решено в этапе 5 (Mangalib палитра: Primary `#E55A36` > 4.5:1 на тёмном фоне, DarkOnPrimary `#121214` > 5.2:1, `ColorContrastTest`) |
+| Ошибка сети при включённом VPN (Manga18fx и заблокированные сайты) | `:core:network`, `:app`, `:source:madara` | бот UA `Manhwaread/0.1`, IPv6 blackholing на tun0, падение системного DNS/ТСПУ, отсутствие user CA / network_security_config, 403 маппился в ProviderAuth | ✅ решено в v0.2.1 (`VpnSafeDns` с IPv4-first и DoH fallback 1.1.1.1/8.8.8.8, браузерный User-Agent Chrome 128, `network_security_config.xml`, `ACCESS_NETWORK_STATE`, Coil `ImageLoaderFactory`, 403 → `CloudflareBlocked`) |
