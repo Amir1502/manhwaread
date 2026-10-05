@@ -190,4 +190,69 @@ class LibraryViewModelTest {
         // Строка не удалена физически — история сохраняется.
         assertTrue(mangaDao.rows.containsKey(1L))
     }
+
+    @Test
+    fun `status counts are calculated per reading status`() = runTest {
+        mangaDao.seed(manga(id = 1L, title = "Solo Leveling").copy(readingStatus = ReadingStatus.READING))
+        mangaDao.seed(manga(id = 2L, title = "Omniscient Reader").copy(readingStatus = ReadingStatus.READING))
+        mangaDao.seed(manga(id = 3L, title = "Berserk").copy(readingStatus = ReadingStatus.PLANNED))
+        mangaDao.seed(manga(id = 4L, title = "Naruto").copy(readingStatus = ReadingStatus.COMPLETED))
+        val viewModel = LibraryViewModel(mangaDao)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.statusCounts[ReadingStatus.READING])
+        assertEquals(1, state.statusCounts[ReadingStatus.PLANNED])
+        assertEquals(1, state.statusCounts[ReadingStatus.COMPLETED])
+        assertEquals(0, state.statusCounts[ReadingStatus.DROPPED])
+        assertEquals(0, state.statusCounts[ReadingStatus.ON_HOLD])
+        assertEquals(4, state.allCount)
+    }
+
+    @Test
+    fun `onStatusSelected filters items by status`() = runTest {
+        mangaDao.seed(manga(id = 1L, title = "Solo Leveling").copy(readingStatus = ReadingStatus.READING))
+        mangaDao.seed(manga(id = 2L, title = "Omniscient Reader").copy(readingStatus = ReadingStatus.PLANNED))
+        val viewModel = LibraryViewModel(mangaDao)
+        advanceUntilIdle()
+
+        viewModel.onStatusSelected(ReadingStatus.READING)
+        assertEquals(listOf(1L), viewModel.uiState.value.items.map { it.id })
+
+        viewModel.onStatusSelected(ReadingStatus.PLANNED)
+        assertEquals(listOf(2L), viewModel.uiState.value.items.map { it.id })
+
+        viewModel.onStatusSelected(ReadingStatus.DROPPED)
+        assertTrue(viewModel.uiState.value.items.isEmpty())
+
+        viewModel.onStatusSelected(null)
+        assertEquals(listOf(1L, 2L), viewModel.uiState.value.items.map { it.id })
+    }
+
+    @Test
+    fun `status and search query filter simultaneously`() = runTest {
+        mangaDao.seed(manga(id = 1L, title = "Solo Leveling").copy(readingStatus = ReadingStatus.READING))
+        mangaDao.seed(manga(id = 2L, title = "Solo Necromancer").copy(readingStatus = ReadingStatus.PLANNED))
+        mangaDao.seed(manga(id = 3L, title = "Omniscient Reader").copy(readingStatus = ReadingStatus.READING))
+        val viewModel = LibraryViewModel(mangaDao)
+        advanceUntilIdle()
+
+        viewModel.onStatusSelected(ReadingStatus.READING)
+        viewModel.onQueryChange("Solo")
+        assertEquals(listOf(1L), viewModel.uiState.value.items.map { it.id })
+    }
+
+    @Test
+    fun `query filters by russian title`() = runTest {
+        mangaDao.seed(
+            manga(id = 1L, title = "Solo Leveling").copy(
+                titleRu = "Поднятие уровня в одиночку",
+            ),
+        )
+        val viewModel = LibraryViewModel(mangaDao)
+        advanceUntilIdle()
+
+        viewModel.onQueryChange("одиночку")
+        assertEquals(listOf(1L), viewModel.uiState.value.items.map { it.id })
+    }
 }

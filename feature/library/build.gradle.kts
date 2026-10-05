@@ -47,6 +47,8 @@ dependencies {
 
     // Сущности и DAO библиотеки.
     implementation(project(":core:database"))
+    // Дизайн-система (токены Mangalib, обложки 3:4, бейджи, чипы).
+    implementation(project(":core:designsystem"))
     // Обложки тайтлов.
     implementation(libs.coil.compose)
 

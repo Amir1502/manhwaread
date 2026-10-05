@@ -3,6 +3,8 @@
     <string name="library_title">Библиотека</string>
     <string name="library_search_hint">Фильтр по названию…</string>
     <string name="library_remove">Убрать из библиотеки</string>
+    <string name="library_tab_all">Все</string>
     <string name="library_empty">Библиотека пуста — добавьте тайтлы из каталога</string>
+    <string name="library_status_empty">Нет тайтлов с этим статусом</string>
     <string name="library_search_empty">Ничего не найдено по фильтру</string>
 </resources>

@@ -3,6 +3,8 @@
     <string name="library_title">Library</string>
     <string name="library_search_hint">Filter by title…</string>
     <string name="library_remove">Remove from library</string>
+    <string name="library_tab_all">All</string>
     <string name="library_empty">The library is empty — add titles from the catalog</string>
+    <string name="library_status_empty">No titles with this status</string>
     <string name="library_search_empty">Nothing matches the filter</string>
 </resources>

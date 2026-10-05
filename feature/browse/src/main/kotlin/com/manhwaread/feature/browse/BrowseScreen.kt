@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -35,23 +34,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import com.manhwaread.core.designsystem.ManhwareadShapes
 import com.manhwaread.core.designsystem.appErrorText
+import com.manhwaread.core.designsystem.component.AgeRatingBadge
+import com.manhwaread.core.designsystem.component.MangaCover
+import com.manhwaread.core.designsystem.component.MangaTypeBadge
+import com.manhwaread.core.designsystem.component.RatingIndicator
 import com.manhwaread.source.api.SManga
 import com.manhwaread.source.api.Source
 
-private val CardImageHeight = 160.dp
-private val CardMinWidth = 110.dp
+private val CardMinWidth = 108.dp
 private val ContentPadding = 12.dp
 private val CardSpacing = 8.dp
 private val BadgePadding = 6.dp
-private val BadgeVerticalPadding = 2.dp
 
 // Точка входа раздела «Каталог» (подключается в NavHost приложения).
 @Composable
@@ -267,38 +267,63 @@ private fun MangaGrid(
 
 @Composable
 private fun MangaGridCard(manga: SManga, onClick: () -> Unit) {
-    Card(onClick = onClick) {
+    Card(
+        onClick = onClick,
+        shape = ManhwareadShapes.Card,
+    ) {
         Column {
-            Box {
-                AsyncImage(
-                    model = manga.thumbnailUrl,
-                    contentDescription = manga.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(CardImageHeight),
-                )
-                if (manga.nsfw) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.error,
-                        shape = MaterialTheme.shapes.extraSmall,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(BadgePadding),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.browse_nsfw_badge),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onError,
-                            modifier = Modifier.padding(
-                                horizontal = BadgePadding,
-                                vertical = BadgeVerticalPadding,
-                            ),
+            MangaCover(
+                model = manga.thumbnailUrl,
+                contentDescription = manga.title,
+                modifier = Modifier.fillMaxWidth(),
+                shape = ManhwareadShapes.Card,
+                overlay = {
+                    manga.type?.let { type ->
+                        MangaTypeBadge(
+                            type = type,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(BadgePadding),
                         )
                     }
-                }
-            }
+
+                    val ageRating = manga.ageRating
+                    if (ageRating != null) {
+                        AgeRatingBadge(
+                            ageRating = ageRating,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(BadgePadding),
+                        )
+                    } else if (manga.nsfw) {
+                        AgeRatingBadge(
+                            ageRating = stringResource(R.string.browse_nsfw_badge),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(BadgePadding),
+                        )
+                    }
+
+                    val rating = manga.rating
+                    if (rating != null && rating > 0f) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shape = ManhwareadShapes.Badge,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(BadgePadding),
+                        ) {
+                            RatingIndicator(
+                                rating = rating,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                },
+            )
             Text(
                 text = manga.title,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(BadgePadding),
