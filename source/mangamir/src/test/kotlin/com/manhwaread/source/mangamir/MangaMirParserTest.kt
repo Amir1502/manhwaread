@@ -180,4 +180,16 @@ class MangaMirParserTest {
             pages[2].imageUrl,
         )
     }
+
+    @Test
+    fun `toSManga maps type rating and ageRating correctly`() {
+        val doc = loadFixture("details_toc.html")
+        val details = MangaMirParser.parseDetails(doc, "korol-mecha")
+        val smanga = details.toSManga(MANGAMIR_SOURCE_ID, "/manga/korol-mecha")
+
+        assertEquals(com.manhwaread.source.api.MangaType.MANHWA, smanga.type)
+        assertEquals(9.52f, smanga.rating)
+        assertEquals("16+", smanga.ageRating)
+        assertFalse(smanga.nsfw)
+    }
 }

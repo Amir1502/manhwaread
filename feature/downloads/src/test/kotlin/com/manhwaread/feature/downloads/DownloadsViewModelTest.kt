@@ -9,6 +9,7 @@ import com.manhwaread.core.database.MangaEntity
 import com.manhwaread.core.database.TranslationJobDao
 import com.manhwaread.core.database.TranslationJobEntity
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.core.pipeline.StageStatus
 import com.manhwaread.feature.downloads.queue.ChapterDeleter
 import com.manhwaread.feature.downloads.queue.ChapterDirs
@@ -167,6 +168,12 @@ class DownloadsViewModelTest {
         override suspend fun setTitleRu(id: Long, titleRu: String?) {
             rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
         }
+
+        override suspend fun setReadingStatus(id: Long, status: ReadingStatus?) {
+            rows[id]?.let { current -> rows[id] = current.copy(readingStatus = status) }
+        }
+
+        override fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>> = MutableStateFlow(emptyList())
 
         override suspend fun deleteById(id: Long) {
             rows.remove(id)

@@ -12,6 +12,7 @@ import com.manhwaread.core.datastore.ApiKeyStore
 import com.manhwaread.core.datastore.SettingsStore
 import com.manhwaread.core.datastore.TranslationSettings
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.core.translation.TranslationProvider
 import com.manhwaread.core.translation.TranslationProviderFactory
 import com.manhwaread.core.translation.TranslationRequest
@@ -103,6 +104,14 @@ class DetailsViewModelTest {
 
         override suspend fun setTitleRu(id: Long, titleRu: String?) {
             rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
+        }
+
+        override suspend fun setReadingStatus(id: Long, status: ReadingStatus?) {
+            rows[id]?.let { current -> rows[id] = current.copy(readingStatus = status) }
+        }
+
+        override fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>> = flow {
+            emit(rows.values.filter { it.inLibrary && it.readingStatus == status })
         }
 
         override suspend fun deleteById(id: Long) {

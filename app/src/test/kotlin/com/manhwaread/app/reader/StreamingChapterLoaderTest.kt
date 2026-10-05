@@ -5,6 +5,7 @@ import com.manhwaread.core.database.ChapterDao
 import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.MangaDao
 import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.feature.reader.ChapterMeta
 import com.manhwaread.feature.reader.ChapterMetaJson
 import com.manhwaread.source.api.Filter
@@ -248,6 +249,9 @@ class StreamingChapterLoaderTest {
 
         // Русский тайтл стримингом не используется: фиксация в фейке не нужна.
         override suspend fun setTitleRu(id: Long, titleRu: String?) = Unit
+        override suspend fun setReadingStatus(id: Long, status: ReadingStatus?) = Unit
+        override fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>> =
+            MutableStateFlow(rows.values.filter { it.inLibrary && it.readingStatus == status })
         override suspend fun deleteById(id: Long) = Unit
     }
 

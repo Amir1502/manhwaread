@@ -6,9 +6,11 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.manhwaread.core.model.ChapterNumberParser
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.core.pipeline.StageStatus
 import com.manhwaread.core.vision.DetectedLang
 import com.manhwaread.source.api.MangaStatus
+import com.manhwaread.source.api.MangaType
 
 // Room-сущности: плоские зеркала доменных моделей :core:model / :core:pipeline /
 // :core:vision-model. Value-классы (PageIndex/ScrollOffsetPx) расплющены в колонки.
@@ -33,6 +35,13 @@ data class MangaEntity(
     val addedAtMs: Long = 0L,
     // Русский тайтл: переводится LLM-провайдером и хранится локально (null — ещё не переведён).
     val titleRu: String? = null,
+    val readingStatus: ReadingStatus? = null,
+    val rating: Float? = null,
+    val altTitle: String? = null,
+    val type: MangaType? = null,
+    val ageRating: String? = null,
+    val year: Int? = null,
+    val chapterCount: Int? = null,
 )
 
 @Entity(

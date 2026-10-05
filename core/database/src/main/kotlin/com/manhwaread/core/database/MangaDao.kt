@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.manhwaread.core.model.ReadingStatus
 import kotlinx.coroutines.flow.Flow
 
 /** CRUD библиотеки: upsert по уникальному (sourceId, url), наблюдение, поиск. */
@@ -53,6 +54,13 @@ interface MangaDao {
     // (upsertBySourceUrl) перевод не затирает, а сам он обновляется независимо.
     @Query("UPDATE manga SET titleRu = :titleRu WHERE id = :id")
     suspend fun setTitleRu(id: Long, titleRu: String?)
+
+    // Статус чтения (В планах, Читаю, Прочитано и др.)
+    @Query("UPDATE manga SET readingStatus = :status WHERE id = :id")
+    suspend fun setReadingStatus(id: Long, status: ReadingStatus?)
+
+    @Query("SELECT * FROM manga WHERE inLibrary = 1 AND readingStatus = :status ORDER BY addedAtMs DESC")
+    fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>>
 
     @Query("DELETE FROM manga WHERE id = :id")
     suspend fun deleteById(id: Long)

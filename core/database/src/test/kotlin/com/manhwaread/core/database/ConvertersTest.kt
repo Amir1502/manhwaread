@@ -54,4 +54,24 @@ class ConvertersTest {
         }
         assertEquals(DetectedLang.UNKNOWN, converters.stringToDetectedLang("???"))
     }
+
+    @Test
+    fun `reading status roundtrip and fallback`() {
+        com.manhwaread.core.model.ReadingStatus.entries.forEach {
+            assertEquals(it, converters.stringToReadingStatus(converters.readingStatusToString(it)))
+        }
+        assertEquals(null, converters.stringToReadingStatus(null))
+        assertEquals(null, converters.stringToReadingStatus("UNKNOWN_STATUS"))
+        assertEquals(null, converters.readingStatusToString(null))
+    }
+
+    @Test
+    fun `manga type roundtrip and fallback`() {
+        com.manhwaread.source.api.MangaType.entries.forEach {
+            assertEquals(it, converters.stringToMangaType(converters.mangaTypeToString(it)))
+        }
+        assertEquals(null, converters.stringToMangaType(null))
+        assertEquals(null, converters.stringToMangaType("UNKNOWN_TYPE"))
+        assertEquals(null, converters.mangaTypeToString(null))
+    }
 }

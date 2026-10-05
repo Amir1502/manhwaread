@@ -16,4 +16,10 @@ data class SManga(
     val thumbnailUrl: String? = null,
     val nsfw: Boolean = false,
     val initialized: Boolean = false,
+    val rating: Float? = null,
+    val altTitle: String? = null,
+    val type: MangaType? = null,
+    val ageRating: String? = null,
+    val year: Int? = null,
+    val chapterCount: Int? = null,
 )

@@ -1,6 +1,7 @@
 package com.manhwaread.core.model
 
 import com.manhwaread.source.api.MangaStatus
+import com.manhwaread.source.api.MangaType
 
 /**
  * Доменная модель тайтла в библиотеке пользователя.
@@ -20,4 +21,11 @@ data class Manga(
     val nsfw: Boolean = false,
     val inLibrary: Boolean = false,
     val addedAtMs: Long = 0L,
+    val readingStatus: ReadingStatus? = null,
+    val rating: Float? = null,
+    val altTitle: String? = null,
+    val type: MangaType? = null,
+    val ageRating: String? = null,
+    val year: Int? = null,
+    val chapterCount: Int? = null,
 )

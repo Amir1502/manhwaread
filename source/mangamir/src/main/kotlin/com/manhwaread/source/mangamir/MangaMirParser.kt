@@ -2,6 +2,7 @@ package com.manhwaread.source.mangamir
 
 import com.manhwaread.core.model.ChapterNumberParser
 import com.manhwaread.source.api.MangaStatus
+import com.manhwaread.source.api.MangaType
 import com.manhwaread.source.api.Page
 import com.manhwaread.source.api.PageStatus
 import com.manhwaread.source.api.SChapter
@@ -65,6 +66,7 @@ internal fun MmCard.toSManga(sourceId: Long): SManga = SManga(
     thumbnailUrl = coverUrl,
     status = status.toMangaStatus(),
     initialized = false,
+    type = MangaType.fromString(type),
 )
 
 internal fun MmDetails.toSManga(sourceId: Long, originalUrl: String): SManga = SManga(
@@ -79,6 +81,9 @@ internal fun MmDetails.toSManga(sourceId: Long, originalUrl: String): SManga = S
     thumbnailUrl = coverUrl,
     nsfw = ageRating == "18+",
     initialized = true,
+    rating = rating?.toFloat(),
+    type = MangaType.fromString(type),
+    ageRating = ageRating,
 )
 
 internal fun MmChapter.toSChapter(): SChapter = SChapter(

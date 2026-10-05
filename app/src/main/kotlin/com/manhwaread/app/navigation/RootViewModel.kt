@@ -18,7 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class RootViewModel @Inject constructor(
     settingsStore: SettingsStore,
-    val errorNotifier: QueueErrorNotifier,
+    val errorNotifier: QueueErrorNotifier = QueueErrorNotifier(),
 ) : ViewModel() {
     val onboardingCompleted: StateFlow<Boolean?> = settingsStore.onboardingCompleted
         .stateIn(scope = viewModelScope, started = SharingStarted.Eagerly, initialValue = null)

@@ -2,6 +2,7 @@ package com.manhwaread.feature.library
 
 import com.manhwaread.core.database.MangaDao
 import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.source.api.MangaStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -80,6 +81,14 @@ class LibraryViewModelTest {
             rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
             publish()
         }
+
+        override suspend fun setReadingStatus(id: Long, status: ReadingStatus?) {
+            rows[id]?.let { current -> rows[id] = current.copy(readingStatus = status) }
+            publish()
+        }
+
+        override fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>> =
+            MutableStateFlow(rows.values.filter { it.inLibrary && it.readingStatus == status })
 
         override suspend fun deleteById(id: Long) {
             rows.remove(id)

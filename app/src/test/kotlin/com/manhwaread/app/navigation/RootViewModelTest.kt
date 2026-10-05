@@ -2,6 +2,7 @@ package com.manhwaread.app.navigation
 
 import com.manhwaread.core.datastore.SettingsStore
 import com.manhwaread.core.datastore.TranslationSettings
+import com.manhwaread.feature.downloads.queue.QueueErrorNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -69,5 +70,12 @@ class RootViewModelTest {
         source.value = true
         advanceUntilIdle()
         assertEquals(true, viewModel.onboardingCompleted.value)
+    }
+
+    @Test
+    fun `errorNotifier is exposed and functional`() = runTest {
+        val notifier = QueueErrorNotifier()
+        val viewModel = RootViewModel(FakeSettingsStore(MutableStateFlow(true)), notifier)
+        assertEquals(notifier, viewModel.errorNotifier)
     }
 }

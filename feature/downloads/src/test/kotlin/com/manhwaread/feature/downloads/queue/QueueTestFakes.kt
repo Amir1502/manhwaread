@@ -16,6 +16,7 @@ import com.manhwaread.core.datastore.ApiKeyStore
 import com.manhwaread.core.datastore.SettingsStore
 import com.manhwaread.core.datastore.TranslationSettings
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.core.pipeline.ChapterAnalyzer
 import com.manhwaread.core.pipeline.ChapterJob
 import com.manhwaread.core.pipeline.OverlayCompositor
@@ -180,6 +181,13 @@ internal class FakeQueueMangaDao : MangaDao {
     override suspend fun setTitleRu(id: Long, titleRu: String?) {
         mangas[id]?.let { manga -> mangas[id] = manga.copy(titleRu = titleRu) }
     }
+
+    override suspend fun setReadingStatus(id: Long, status: ReadingStatus?) {
+        mangas[id]?.let { manga -> mangas[id] = manga.copy(readingStatus = status) }
+    }
+
+    override fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>> =
+        MutableStateFlow(mangas.values.filter { it.inLibrary && it.readingStatus == status })
 
     override suspend fun deleteById(id: Long) {
         mangas.remove(id)

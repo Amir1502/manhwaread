@@ -110,4 +110,66 @@ class MangaDaoTest : DaoTestBase() {
         assertNull(db.mangaDao().findBySourceUrl(9L, "/manga/x"))
         assertEquals("Solo Leveling", db.mangaDao().findBySourceUrl(7L, "/manga/x")?.title)
     }
+
+    @Test
+    fun `set reading status stores and updates status`() = runBlocking {
+        val dao = db.mangaDao()
+        val id = dao.upsert(DatabaseFixtures.manga())
+        assertNull(dao.findById(id)?.readingStatus)
+
+        dao.setReadingStatus(id, com.manhwaread.core.model.ReadingStatus.READING)
+        assertEquals(com.manhwaread.core.model.ReadingStatus.READING, dao.findById(id)?.readingStatus)
+
+        dao.setReadingStatus(id, com.manhwaread.core.model.ReadingStatus.COMPLETED)
+        assertEquals(com.manhwaread.core.model.ReadingStatus.COMPLETED, dao.findById(id)?.readingStatus)
+
+        dao.setReadingStatus(id, null)
+        assertNull(dao.findById(id)?.readingStatus)
+    }
+
+    @Test
+    fun `observe library by status filters correctly`() = runBlocking {
+        val dao = db.mangaDao()
+        val id1 = dao.upsert(DatabaseFixtures.manga(url = "/manga/1", inLibrary = true))
+        val id2 = dao.upsert(DatabaseFixtures.manga(url = "/manga/2", inLibrary = true))
+        val id3 = dao.upsert(DatabaseFixtures.manga(url = "/manga/3", inLibrary = false))
+
+        dao.setReadingStatus(id1, com.manhwaread.core.model.ReadingStatus.READING)
+        dao.setReadingStatus(id2, com.manhwaread.core.model.ReadingStatus.PLANNED)
+        dao.setReadingStatus(id3, com.manhwaread.core.model.ReadingStatus.READING)
+
+        val readingList = withTimeout(DAO_TIMEOUT_MS) {
+            dao.observeLibraryByStatus(com.manhwaread.core.model.ReadingStatus.READING).first()
+        }
+        assertEquals(listOf("/manga/1"), readingList.map { it.url })
+
+        val plannedList = withTimeout(DAO_TIMEOUT_MS) {
+            dao.observeLibraryByStatus(com.manhwaread.core.model.ReadingStatus.PLANNED).first()
+        }
+        assertEquals(listOf("/manga/2"), plannedList.map { it.url })
+    }
+
+    @Test
+    fun `upsert roundtrips all metadata fields`() = runBlocking {
+        val dao = db.mangaDao()
+        val entity = DatabaseFixtures.manga().copy(
+            readingStatus = com.manhwaread.core.model.ReadingStatus.READING,
+            rating = 9.5f,
+            altTitle = "Alternative Title",
+            type = com.manhwaread.source.api.MangaType.MANHWA,
+            ageRating = "18+",
+            year = 2021,
+            chapterCount = 150,
+        )
+        val id = dao.upsert(entity)
+        val loaded = dao.findById(id)
+        assertNotNull(loaded)
+        assertEquals(com.manhwaread.core.model.ReadingStatus.READING, loaded?.readingStatus)
+        assertEquals(9.5f, loaded?.rating)
+        assertEquals("Alternative Title", loaded?.altTitle)
+        assertEquals(com.manhwaread.source.api.MangaType.MANHWA, loaded?.type)
+        assertEquals("18+", loaded?.ageRating)
+        assertEquals(2021, loaded?.year)
+        assertEquals(150, loaded?.chapterCount)
+    }
 }

@@ -68,6 +68,45 @@ class SMangaTest {
         assertFalse(minimal.initialized)
         assertFalse(minimal.nsfw)
         assertNull(minimal.thumbnailUrl)
+        assertNull(minimal.rating)
+        assertNull(minimal.altTitle)
+        assertNull(minimal.type)
+        assertNull(minimal.ageRating)
+        assertNull(minimal.year)
+        assertNull(minimal.chapterCount)
+    }
+
+    @Test
+    fun `copy preserves new additive fields`() {
+        val manga = original.copy(
+            rating = 4.85f,
+            altTitle = "На solo",
+            type = MangaType.MANHWA,
+            ageRating = "16+",
+            year = 2020,
+            chapterCount = 179,
+        )
+
+        val updated = manga.copy(title = "Solo Leveling II")
+        assertEquals(4.85f, updated.rating)
+        assertEquals("На solo", updated.altTitle)
+        assertEquals(MangaType.MANHWA, updated.type)
+        assertEquals("16+", updated.ageRating)
+        assertEquals(2020, updated.year)
+        assertEquals(179, updated.chapterCount)
+    }
+
+    @Test
+    fun `manga type parses from strings`() {
+        assertEquals(MangaType.MANHWA, MangaType.fromString("Манхва"))
+        assertEquals(MangaType.MANHWA, MangaType.fromString("manhwa"))
+        assertEquals(MangaType.MANGA, MangaType.fromString("Манга"))
+        assertEquals(MangaType.MANGA, MangaType.fromString("manga"))
+        assertEquals(MangaType.MANHUA, MangaType.fromString("Маньхуа"))
+        assertEquals(MangaType.MANHUA, MangaType.fromString("manhua"))
+        assertEquals(MangaType.OTHER, MangaType.fromString("Комикс"))
+        assertNull(MangaType.fromString(null))
+        assertNull(MangaType.fromString("   "))
     }
 
     private fun assertNotEquals(unexpected: Any?, actual: Any?) =

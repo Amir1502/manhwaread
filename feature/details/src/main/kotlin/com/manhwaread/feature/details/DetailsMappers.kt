@@ -28,6 +28,13 @@ internal fun SManga.toEntityPreserving(existing: MangaEntity?): MangaEntity = Ma
     inLibrary = existing?.inLibrary ?: false,
     addedAtMs = existing?.addedAtMs ?: 0L,
     titleRu = existing?.titleRu,
+    readingStatus = existing?.readingStatus,
+    rating = rating ?: existing?.rating,
+    altTitle = altTitle ?: existing?.altTitle,
+    type = type ?: existing?.type,
+    ageRating = ageRating ?: existing?.ageRating,
+    year = year ?: existing?.year,
+    chapterCount = chapterCount ?: existing?.chapterCount,
 )
 
 /** SChapter → ChapterEntity: сезон из названия, номер — из источника или парсера. */

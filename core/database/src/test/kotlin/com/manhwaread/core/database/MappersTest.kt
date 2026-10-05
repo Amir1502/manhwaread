@@ -39,8 +39,23 @@ class MappersTest {
             nsfw = false,
             inLibrary = true,
             addedAtMs = 42L,
+            readingStatus = com.manhwaread.core.model.ReadingStatus.READING,
+            rating = 9.8f,
+            altTitle = "На solo",
+            type = com.manhwaread.source.api.MangaType.MANHWA,
+            ageRating = "16+",
+            year = 2018,
+            chapterCount = 200,
         )
         assertEquals(manga, manga.toEntity().toDomain())
+
+        val minimal = Manga(
+            id = 1L,
+            sourceId = 2L,
+            url = "/manga/min",
+            title = "Minimal",
+        )
+        assertEquals(minimal, minimal.toEntity().toDomain())
     }
 
     @Test

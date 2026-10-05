@@ -6,6 +6,7 @@ import com.manhwaread.core.database.HistoryDao
 import com.manhwaread.core.database.HistoryEntity
 import com.manhwaread.core.database.MangaDao
 import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.source.api.MangaStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -98,6 +99,12 @@ class HistoryViewModelTest {
         override suspend fun setTitleRu(id: Long, titleRu: String?) {
             rows[id]?.let { current -> rows[id] = current.copy(titleRu = titleRu) }
         }
+
+        override suspend fun setReadingStatus(id: Long, status: ReadingStatus?) {
+            rows[id]?.let { current -> rows[id] = current.copy(readingStatus = status) }
+        }
+
+        override fun observeLibraryByStatus(status: ReadingStatus): Flow<List<MangaEntity>> = MutableStateFlow(emptyList())
 
         override suspend fun deleteById(id: Long) {
             rows.remove(id)
