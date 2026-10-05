@@ -1,9 +1,13 @@
 package com.manhwaread.feature.reader
 
 import android.app.Activity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,30 +17,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,13 +38,16 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.manhwaread.core.designsystem.ManhwareadPalette
+import com.manhwaread.core.designsystem.ManhwareadShapes
+import com.manhwaread.core.designsystem.ManhwareadTypography
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.io.File
 
-private val SliderPadding = 12.dp
 private val SheetHorizontalPadding = 16.dp
 private val SheetBottomPadding = 24.dp
 private val SheetBlockSpacing = 8.dp
+private const val CORRUPT_PAGE_HEIGHT_DP = 240
 
 // Экран читалки: четыре режима (вебтун-лента, вертикальный и горизонтальные
 // пейджеры), зум до 5x, векторный слой перевода, карточка бабла по тапу.
@@ -81,41 +73,61 @@ fun ReaderScreen(
             onProgress(state.currentPageIndex)
         }
     }
-    Scaffold(
-        // Панели читалки рендерятся только при видимом chrome: тап мимо бабла
-        // скрывает их, повторный тап возвращает (полноэкранное чтение).
-        topBar = {
-            if (state.chromeVisible) {
-                TopAppBar(
-                    title = { Text(state.chapter?.title.orEmpty()) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.reader_back),
-                            )
-                        }
-                    },
-                )
-            }
-        },
-        bottomBar = {
-            val chapter = state.chapter
-            if (state.chromeVisible && chapter != null && chapter.pages.isNotEmpty()) {
-                ReaderBottomBar(state = state, pageCount = chapter.pages.size, viewModel = viewModel)
-            }
-        },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .onSizeChanged { size -> viewModel.setViewportSize(size.width.toFloat(), size.height.toFloat()) },
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { size ->
+                viewModel.setViewportSize(size.width.toFloat(), size.height.toFloat())
+            },
+    ) {
+        ReaderContent(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
+
+        val chapter = state.chapter
+        val pageCount = chapter?.pages?.size ?: 0
+
+        AnimatedVisibility(
+            visible = !state.chromeVisible && pageCount > 0,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            ReaderContent(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
-            state.selectedBubble?.let { bubble ->
-                ReaderBubbleSheet(bubble = bubble, onDismiss = viewModel::dismissBubbleSheet)
-            }
+            ReaderMinimalInfoStrip(
+                currentPage = state.currentPageIndex,
+                pageCount = pageCount,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = state.chromeVisible,
+            enter = slideInVertically { -it } + fadeIn(),
+            exit = slideOutVertically { -it } + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            ReaderTopBar(
+                title = chapter?.title.orEmpty(),
+                onBack = onBack,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = state.chromeVisible && chapter != null && pageCount > 0,
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            ReaderBottomBar(
+                state = state,
+                pageCount = pageCount,
+                onPageChange = { page -> viewModel.setCurrentPage(page) },
+                onPageChangeFinished = { viewModel.requestScrollToPage(state.currentPageIndex) },
+                onToggleOverlay = viewModel::toggleOverlay,
+                onSelectMode = viewModel::setMode,
+            )
+        }
+
+        state.selectedBubble?.let { bubble ->
+            ReaderBubbleSheet(bubble = bubble, onDismiss = viewModel::dismissBubbleSheet)
         }
     }
 }
@@ -146,10 +158,14 @@ private fun ReaderContent(
 ) {
     when {
         state.isLoading -> Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = ManhwareadPalette.DarkPrimary)
         }
         state.loadError != null -> Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text(text = state.loadError.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = state.loadError.orEmpty(),
+                style = ManhwareadTypography.bodyLarge,
+                color = ManhwareadPalette.DarkError,
+            )
         }
         state.chapter != null -> when {
             state.mode.isContinuousWebtoon -> WebtoonList(state = state, viewModel = viewModel)
@@ -157,14 +173,14 @@ private fun ReaderContent(
             else -> HorizontalPagePager(state = state, viewModel = viewModel)
         }
         else -> Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text(text = stringResource(R.string.reader_empty), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = stringResource(R.string.reader_empty),
+                style = ManhwareadTypography.bodyLarge,
+                color = ManhwareadPalette.DarkOnSurfaceVariant,
+            )
         }
     }
 }
-
-// Высота элемента ленты для битой страницы (heightPx == 0): фиксированный
-// плейсхолдер, чтобы сообщение об ошибке было видно и в вебтун-режиме.
-private const val CORRUPT_PAGE_HEIGHT_DP = 240
 
 // Вебтун: непрерывная лента без швов — интервалы между элементами нулевые,
 // высота элемента точно равна высоте страницы в текущем масштабе.
@@ -188,7 +204,7 @@ private fun WebtoonList(state: ReaderUiState, viewModel: ReaderViewModel) {
         }
     }
     LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0 }
+        snapshotFlow { findCenterVisibleItemIndex(listState.layoutInfo) }
             .distinctUntilChanged()
             .collect { index -> viewModel.setCurrentPage(index) }
     }
@@ -296,73 +312,15 @@ private fun PagerPage(state: ReaderUiState, viewModel: ReaderViewModel, page: Re
     )
 }
 
-@Composable
-private fun ReaderBottomBar(state: ReaderUiState, pageCount: Int, viewModel: ReaderViewModel) {
-    var modeMenuExpanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider()
-        if (pageCount > 1) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Slider(
-                    value = state.currentPageIndex.toFloat(),
-                    onValueChange = { value -> viewModel.setCurrentPage(value.toInt()) },
-                    onValueChangeFinished = { viewModel.requestScrollToPage(state.currentPageIndex) },
-                    valueRange = 0f..(pageCount - 1).toFloat(),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = SliderPadding),
-                )
-                Text(
-                    text = "${state.currentPageIndex + 1}/$pageCount",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(end = SliderPadding),
-                )
-            }
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = SliderPadding),
-        ) {
-            IconButton(onClick = viewModel::toggleOverlay) {
-                Icon(
-                    imageVector = Icons.Filled.Translate,
-                    contentDescription = stringResource(
-                        if (state.showOverlay) R.string.reader_overlay_hide else R.string.reader_overlay_show,
-                    ),
-                    tint = if (state.showOverlay) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-            Box {
-                TextButton(onClick = { modeMenuExpanded = true }) {
-                    Text(stringResource(state.mode.labelRes()))
-                }
-                DropdownMenu(expanded = modeMenuExpanded, onDismissRequest = { modeMenuExpanded = false }) {
-                    ReaderMode.entries.forEach { mode ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(mode.labelRes())) },
-                            onClick = {
-                                viewModel.setMode(mode)
-                                modeMenuExpanded = false
-                            },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 // Карточка бабла по тапу: оригинал и перевод (DoD).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderBubbleSheet(bubble: SelectedBubble, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = ManhwareadPalette.DarkSurface,
+        shape = ManhwareadShapes.BottomSheet,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -371,19 +329,27 @@ private fun ReaderBubbleSheet(bubble: SelectedBubble, onDismiss: () -> Unit) {
         ) {
             Text(
                 text = stringResource(R.string.reader_bubble_original),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = ManhwareadTypography.labelMedium,
+                color = ManhwareadPalette.DarkOnSurfaceVariant,
             )
-            Text(text = bubble.originalText, style = MaterialTheme.typography.bodyLarge)
-            HorizontalDivider(modifier = Modifier.padding(vertical = SheetBlockSpacing))
+            Text(
+                text = bubble.originalText,
+                style = ManhwareadTypography.bodyLarge,
+                color = ManhwareadPalette.DarkOnSurface,
+            )
+            HorizontalDivider(
+                color = ManhwareadPalette.DarkSurfaceVariant,
+                modifier = Modifier.padding(vertical = SheetBlockSpacing),
+            )
             Text(
                 text = stringResource(R.string.reader_bubble_translated),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = ManhwareadTypography.labelMedium,
+                color = ManhwareadPalette.DarkOnSurfaceVariant,
             )
             Text(
                 text = bubble.translatedText ?: stringResource(R.string.reader_no_translation),
-                style = MaterialTheme.typography.bodyLarge,
+                style = ManhwareadTypography.bodyLarge,
+                color = ManhwareadPalette.DarkOnSurface,
             )
         }
     }

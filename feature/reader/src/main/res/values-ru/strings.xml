@@ -14,4 +14,7 @@
     <string name="reader_page_corrupted">Файл страницы повреждён</string>
     <string name="reader_page_failed">Не удалось декодировать страницу</string>
     <string name="reader_page_retry">Повторить</string>
+    <string name="reader_page_progress_pattern">%1$d / %2$d</string>
+    <string name="reader_mode_selector">Режим чтения</string>
+    <string name="reader_slider_description">Ползунок страниц</string>
 </resources>

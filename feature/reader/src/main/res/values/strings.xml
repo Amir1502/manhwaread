@@ -14,4 +14,7 @@
     <string name="reader_page_corrupted">Page image is damaged</string>
     <string name="reader_page_failed">Could not decode page</string>
     <string name="reader_page_retry">Retry</string>
+    <string name="reader_page_progress_pattern">%1$d / %2$d</string>
+    <string name="reader_mode_selector">Reading mode</string>
+    <string name="reader_slider_description">Page navigation slider</string>
 </resources>
