@@ -36,8 +36,15 @@ dependencies {
     api(libs.compose.ui.graphics)
     api(libs.compose.foundation)
     api(libs.compose.material3)
+    api(libs.compose.material.icons.extended)
     api(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
+
+    // Доменные модели (ReadingStatus, MangaType) для бейджей и чипов.
+    api(project(":core:model"))
+
+    // Обложки и асинхронные изображения.
+    api(libs.coil.compose)
 
     // AppError входит в сигнатуру общего маппера ошибок (ФАЗА 14) — api.
     api(project(":core:common"))

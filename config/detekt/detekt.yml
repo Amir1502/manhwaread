@@ -11,6 +11,10 @@ complexity:
   LongParameterList:
     functionThreshold: 8
     constructorThreshold: 10
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+    ignoreAnnotated:
+      - 'Composable'
   CyclomaticComplexMethod:
     threshold: 20
   TooManyFunctions:
@@ -32,6 +36,8 @@ style:
     ignoreRanges: true
     ignorePropertyDeclaration: true
     ignoreConstantDeclaration: true
+    ignoreAnnotated:
+      - 'Composable'
   ReturnCount:
     max: 4
   ForbiddenComment:

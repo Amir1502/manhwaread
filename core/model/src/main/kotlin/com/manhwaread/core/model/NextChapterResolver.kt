@@ -60,11 +60,18 @@ object NextChapterResolver {
         if (chapters.isEmpty()) return NextChapterTarget.None
 
         val ordered = chapters.sortedWith(ChapterReadingOrderComparator)
-
         if (ordered.all { it.read }) {
             return NextChapterTarget.ReRead(ordered.first())
         }
 
+        val target = resolveUnreadTarget(ordered, lastReadChapterId)
+        return target ?: NextChapterTarget.ReRead(ordered.first())
+    }
+
+    private fun resolveUnreadTarget(
+        ordered: List<Chapter>,
+        lastReadChapterId: Long?,
+    ): NextChapterTarget? {
         val noneRead = ordered.none { it.read }
         if (noneRead && lastReadChapterId == null) {
             return NextChapterTarget.Start(ordered.first())
@@ -80,15 +87,11 @@ object NextChapterResolver {
             }
         }
 
-        val firstUnread = ordered.firstOrNull { !it.read }
-        return if (firstUnread != null) {
-            if (noneRead) {
-                NextChapterTarget.Start(firstUnread)
-            } else {
-                NextChapterTarget.Resume(firstUnread)
-            }
+        val firstUnread = ordered.firstOrNull { !it.read } ?: return null
+        return if (noneRead) {
+            NextChapterTarget.Start(firstUnread)
         } else {
-            NextChapterTarget.ReRead(ordered.first())
+            NextChapterTarget.Resume(firstUnread)
         }
     }
 }

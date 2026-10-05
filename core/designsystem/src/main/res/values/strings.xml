@@ -14,4 +14,21 @@
     <string name="ds_error_typeset_overflow">Text does not fit into bubble %1$s.</string>
     <string name="ds_error_storage_full">Storage is full.</string>
     <string name="ds_error_unknown">Unknown error.</string>
+
+    <!-- Reading status labels -->
+    <string name="ds_status_reading">Reading</string>
+    <string name="ds_status_planned">Plan to read</string>
+    <string name="ds_status_completed">Completed</string>
+    <string name="ds_status_dropped">Dropped</string>
+    <string name="ds_status_on_hold">On hold</string>
+
+    <!-- Manga type labels -->
+    <string name="ds_type_manhwa">Manhwa</string>
+    <string name="ds_type_manga">Manga</string>
+    <string name="ds_type_manhua">Manhua</string>
+    <string name="ds_type_other">Other</string>
+
+    <!-- UI Component accessibility descriptions -->
+    <string name="ds_manga_cover">Manga cover</string>
+    <string name="ds_rating_description">Rating: %1$s</string>
 </resources>

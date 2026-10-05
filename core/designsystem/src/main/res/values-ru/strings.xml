@@ -14,4 +14,21 @@
     <string name="ds_error_typeset_overflow">Текст не помещается в бабл %1$s.</string>
     <string name="ds_error_storage_full">Хранилище заполнено.</string>
     <string name="ds_error_unknown">Неизвестная ошибка.</string>
+
+    <!-- Статусы чтения -->
+    <string name="ds_status_reading">Читаю</string>
+    <string name="ds_status_planned">В планах</string>
+    <string name="ds_status_completed">Прочитано</string>
+    <string name="ds_status_dropped">Брошено</string>
+    <string name="ds_status_on_hold">Отложено</string>
+
+    <!-- Типы тайтлов -->
+    <string name="ds_type_manhwa">Манхва</string>
+    <string name="ds_type_manga">Манга</string>
+    <string name="ds_type_manhua">Маньхуа</string>
+    <string name="ds_type_other">Другое</string>
+
+    <!-- Описания доступности компонентов -->
+    <string name="ds_manga_cover">Обложка тайтла</string>
+    <string name="ds_rating_description">Рейтинг: %1$s</string>
 </resources>

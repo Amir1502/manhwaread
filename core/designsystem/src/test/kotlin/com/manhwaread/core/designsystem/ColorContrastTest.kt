@@ -78,6 +78,18 @@ class ColorContrastTest {
     }
 
     @Test
+    fun `mangalib primary accent meets contrast on dark background and surface`() {
+        assertTrue(
+            contrastRatio(ManhwareadPalette.DarkPrimary.toArgb(), ManhwareadPalette.DarkBackground.toArgb()) >= CONTRAST_AA_TEXT,
+            "dark primary on dark background must be >= 4.5:1",
+        )
+        assertTrue(
+            contrastRatio(ManhwareadPalette.DarkPrimary.toArgb(), ManhwareadPalette.DarkSurface.toArgb()) >= CONTRAST_AA_TEXT,
+            "dark primary on dark surface must be >= 4.5:1",
+        )
+    }
+
+    @Test
     fun `outline meets UI component threshold on surfaces`() {
         assertTrue(
             contrastRatio(ManhwareadPalette.DarkOutline.toArgb(), ManhwareadPalette.DarkSurface.toArgb()) >= CONTRAST_AA_UI,
@@ -86,6 +98,21 @@ class ColorContrastTest {
         assertTrue(
             contrastRatio(ManhwareadPalette.LightOutline.toArgb(), ManhwareadPalette.LightSurface.toArgb()) >= CONTRAST_AA_UI,
             "light outline on surface must be >= 3:1",
+        )
+    }
+
+    @Test
+    fun `status and extra colors meet contrast`() {
+        assertTrue(
+            contrastRatio(ManhwareadPalette.OnSuccess.toArgb(), ManhwareadPalette.Success.toArgb()) >= CONTRAST_AA_TEXT,
+            "onSuccess on success must be >= 4.5:1",
+        )
+        assertTrue(
+            contrastRatio(
+                ManhwareadPalette.OnSuccessContainer.toArgb(),
+                ManhwareadPalette.SuccessContainer.toArgb(),
+            ) >= CONTRAST_AA_TEXT,
+            "onSuccessContainer on successContainer must be >= 4.5:1",
         )
     }
 
