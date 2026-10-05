@@ -19,4 +19,19 @@
     <string name="details_added_to_library">Added to library</string>
     <string name="details_removed_from_library">Removed from library</string>
     <string name="details_download_chapter">Download chapter</string>
+    <string name="details_tab_info">About</string>
+    <string name="details_tab_chapters">Chapters (%1$d)</string>
+    <string name="details_action_start_reading">Start reading</string>
+    <string name="details_action_resume_reading">Resume: %1$s</string>
+    <string name="details_action_reread">Reread from start</string>
+    <string name="details_sort_newest">Newest first</string>
+    <string name="details_sort_oldest">Oldest first</string>
+    <string name="details_filter_unread">Unread only</string>
+    <string name="details_search_chapters_hint">Search chapters…</string>
+    <string name="details_read_more">More</string>
+    <string name="details_read_less">Less</string>
+    <string name="details_year">Year: %1$d</string>
+    <string name="details_type">Type: %1$s</string>
+    <string name="details_alt_title">Alternative: %1$s</string>
+    <string name="details_reading_status_title">Reading status</string>
 </resources>

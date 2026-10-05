@@ -589,4 +589,102 @@ class DetailsViewModelTest {
         assertEquals(AppError.SourceUnavailable, viewModel.uiState.value.error)
         assertEquals(2, source.detailsCalls)
     }
+
+    @Test
+    fun `onTabSelected switches between INFO and CHAPTERS`() = runTest {
+        val viewModel = viewModelWith(FakeSource(id = 1L, details = detailsManga))
+        assertEquals(DetailsTab.INFO, viewModel.uiState.value.selectedTab)
+        viewModel.onTabSelected(DetailsTab.CHAPTERS)
+        assertEquals(DetailsTab.CHAPTERS, viewModel.uiState.value.selectedTab)
+        viewModel.onTabSelected(DetailsTab.INFO)
+        assertEquals(DetailsTab.INFO, viewModel.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun `onReadingStatusChange sets status and adds to library`() = runTest {
+        val viewModel = viewModelWith(FakeSource(id = 1L, details = detailsManga))
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+
+        viewModel.onReadingStatusChange(ReadingStatus.READING)
+        advanceUntilIdle()
+
+        val manga = requireNotNull(viewModel.uiState.value.manga)
+        assertEquals(ReadingStatus.READING, manga.readingStatus)
+        assertTrue(manga.inLibrary)
+
+        viewModel.onReadingStatusChange(null)
+        advanceUntilIdle()
+        assertNull(requireNotNull(viewModel.uiState.value.manga).readingStatus)
+    }
+
+    @Test
+    fun `chapter filtering and sorting works properly`() = runTest {
+        val chapters = listOf(
+            SChapter(url = "/1", name = "Глава 1", chapterNumber = 1f),
+            SChapter(url = "/2", name = "Глава 2", chapterNumber = 2f),
+            SChapter(url = "/extra", name = "Экстра", chapterNumber = -1f),
+        )
+        val viewModel = viewModelWith(FakeSource(id = 1L, details = detailsManga, chapters = chapters))
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+
+        // По умолчанию NEWEST_FIRST (обратный хронологический): Экстра, Глава 2, Глава 1
+        val state = viewModel.uiState.value
+        assertEquals(3, state.filteredChapters.size)
+        assertEquals(listOf("Экстра", "Глава 2", "Глава 1"), state.filteredChapters.map { it.name })
+
+        // Переключение сортировки на OLDEST_FIRST
+        viewModel.onToggleSortOrder()
+        assertEquals(ChapterSortOrder.OLDEST_FIRST, viewModel.uiState.value.sortOrder)
+        assertEquals(listOf("Глава 1", "Глава 2", "Экстра"), viewModel.uiState.value.filteredChapters.map { it.name })
+
+        // Фильтрация по строке поиска
+        viewModel.onChapterQueryChange("Экстра")
+        assertEquals(listOf("Экстра"), viewModel.uiState.value.filteredChapters.map { it.name })
+        viewModel.onChapterQueryChange("")
+
+        // Фильтрация только непрочитанных
+        val ch1 = requireNotNull(chapterDao.rows.firstOrNull { it.name == "Глава 1" })
+        chapterDao.setRead(ch1.id, true)
+        advanceUntilIdle()
+
+        viewModel.onToggleOnlyUnread()
+        assertTrue(viewModel.uiState.value.onlyUnread)
+        assertEquals(listOf("Глава 2", "Экстра"), viewModel.uiState.value.filteredChapters.map { it.name })
+    }
+
+    @Test
+    fun `nextChapterTarget resolves Start, Resume, and ReRead targets`() = runTest {
+        val chapters = listOf(
+            SChapter(url = "/1", name = "Глава 1", chapterNumber = 1f),
+            SChapter(url = "/2", name = "Глава 2", chapterNumber = 2f),
+        )
+        val viewModel = viewModelWith(FakeSource(id = 1L, details = detailsManga, chapters = chapters))
+        viewModel.openBySourceUrl(1L, "/manga/solo")
+        advanceUntilIdle()
+
+        // Ничего не прочитано -> Start с первой главы
+        val startTarget = viewModel.uiState.value.nextChapterTarget
+        assertTrue(startTarget is com.manhwaread.core.model.NextChapterTarget.Start)
+        assertEquals("Глава 1", (startTarget as com.manhwaread.core.model.NextChapterTarget.Start).chapter.name)
+
+        // Первая глава прочитана -> Resume со второй
+        val ch1 = requireNotNull(chapterDao.rows.firstOrNull { it.name == "Глава 1" })
+        chapterDao.setRead(ch1.id, true)
+        advanceUntilIdle()
+
+        val resumeTarget = viewModel.uiState.value.nextChapterTarget
+        assertTrue(resumeTarget is com.manhwaread.core.model.NextChapterTarget.Resume)
+        assertEquals("Глава 2", (resumeTarget as com.manhwaread.core.model.NextChapterTarget.Resume).chapter.name)
+
+        // Все главы прочитаны -> ReRead с первой
+        val ch2 = requireNotNull(chapterDao.rows.firstOrNull { it.name == "Глава 2" })
+        chapterDao.setRead(ch2.id, true)
+        advanceUntilIdle()
+
+        val rereadTarget = viewModel.uiState.value.nextChapterTarget
+        assertTrue(rereadTarget is com.manhwaread.core.model.NextChapterTarget.ReRead)
+        assertEquals("Глава 1", (rereadTarget as com.manhwaread.core.model.NextChapterTarget.ReRead).chapter.name)
+    }
 }

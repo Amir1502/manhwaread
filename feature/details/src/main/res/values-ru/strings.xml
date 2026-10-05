@@ -19,4 +19,19 @@
     <string name="details_added_to_library">Добавлено в библиотеку</string>
     <string name="details_removed_from_library">Убрано из библиотеки</string>
     <string name="details_download_chapter">Скачать главу</string>
+    <string name="details_tab_info">О тайтле</string>
+    <string name="details_tab_chapters">Главы (%1$d)</string>
+    <string name="details_action_start_reading">Начать читать</string>
+    <string name="details_action_resume_reading">Продолжить: %1$s</string>
+    <string name="details_action_reread">Перечитать сначала</string>
+    <string name="details_sort_newest">Новые первые</string>
+    <string name="details_sort_oldest">Старые первые</string>
+    <string name="details_filter_unread">Только непрочитанные</string>
+    <string name="details_search_chapters_hint">Поиск по главам…</string>
+    <string name="details_read_more">Ещё</string>
+    <string name="details_read_less">Свернуть</string>
+    <string name="details_year">Год: %1$d</string>
+    <string name="details_type">Тип: %1$s</string>
+    <string name="details_alt_title">Другие названия: %1$s</string>
+    <string name="details_reading_status_title">Статус чтения</string>
 </resources>

@@ -11,6 +11,7 @@ import com.manhwaread.core.database.MangaDao
 import com.manhwaread.core.datastore.ApiKeyStore
 import com.manhwaread.core.datastore.SettingsStore
 import com.manhwaread.core.model.DownloadStatus
+import com.manhwaread.core.model.ReadingStatus
 import com.manhwaread.core.translation.ProviderConfig
 import com.manhwaread.core.translation.TitleTranslator
 import com.manhwaread.core.translation.TranslationProvider
@@ -94,6 +95,41 @@ class DetailsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun onReadingStatusChange(status: ReadingStatus?) {
+        val manga = _uiState.value.manga ?: return
+        viewModelScope.launch {
+            mangaDao.setReadingStatus(manga.id, status)
+            if (status != null && !manga.inLibrary) {
+                mangaDao.setInLibrary(manga.id, true, System.currentTimeMillis())
+            }
+            val fresh = mangaDao.findById(manga.id)
+            _uiState.update { it.copy(manga = fresh) }
+        }
+    }
+
+    fun onTabSelected(tab: DetailsTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun onChapterQueryChange(query: String) {
+        _uiState.update { it.copy(chapterQuery = query) }
+    }
+
+    fun onToggleSortOrder() {
+        _uiState.update { state ->
+            val nextOrder = if (state.sortOrder == ChapterSortOrder.NEWEST_FIRST) {
+                ChapterSortOrder.OLDEST_FIRST
+            } else {
+                ChapterSortOrder.NEWEST_FIRST
+            }
+            state.copy(sortOrder = nextOrder)
+        }
+    }
+
+    fun onToggleOnlyUnread() {
+        _uiState.update { it.copy(onlyUnread = !it.onlyUnread) }
     }
 
     // Клик по главе: читалка открывается сразу — нескачанная глава стримится

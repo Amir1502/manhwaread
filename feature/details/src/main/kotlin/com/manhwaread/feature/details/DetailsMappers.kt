@@ -2,6 +2,7 @@ package com.manhwaread.feature.details
 
 import com.manhwaread.core.database.ChapterEntity
 import com.manhwaread.core.database.MangaEntity
+import com.manhwaread.core.model.Chapter
 import com.manhwaread.core.model.ChapterNumberParser
 import com.manhwaread.source.api.SChapter
 import com.manhwaread.source.api.SManga
@@ -47,4 +48,30 @@ internal fun SChapter.toEntity(mangaId: Long): ChapterEntity = ChapterEntity(
     dateUploadMs = dateUpload,
     scanlator = scanlator,
     read = false,
+)
+
+/** ChapterEntity → Chapter (доменная модель для работы с NextChapterResolver). */
+internal fun ChapterEntity.toDomain(): Chapter = Chapter(
+    id = id,
+    mangaId = mangaId,
+    url = url,
+    name = name,
+    season = season,
+    chapterNumber = chapterNumber,
+    dateUploadMs = dateUploadMs,
+    scanlator = scanlator,
+    read = read,
+)
+
+/** Chapter → ChapterEntity. */
+internal fun Chapter.toEntity(): ChapterEntity = ChapterEntity(
+    id = id,
+    mangaId = mangaId,
+    url = url,
+    name = name,
+    season = season,
+    chapterNumber = chapterNumber,
+    dateUploadMs = dateUploadMs,
+    scanlator = scanlator,
+    read = read,
 )
